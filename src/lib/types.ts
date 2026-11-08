@@ -1,69 +1,65 @@
-// Contract between the UI and the channel implementation.
+import { z } from "zod";
 
-export type Role = "member" | "dispatch";
+// Data shapes are zod schemas: they validate what arrives over the network (typed `unknown`),
+// and the TypeScript types are derived from them, so both always match.
+
+export const RoleSchema = z.enum(["member", "dispatch"]);
+export type Role = z.infer<typeof RoleSchema>;
 
 // Type guard: lets TypeScript treat a plain string (e.g. from a <select>) as a Role without `as`.
 export const isRole = (value: string): value is Role =>
-  value === "member" || value === "dispatch";
+  RoleSchema.safeParse(value).success;
 
-export type PeerInfo = {
-  id: string; // PeerJS id, e.g. "wt-factory1-dispatch"
-  name: string; // display name
-  role: Role;
-};
-
-export type FeedItem = {
-  id: string; // lets the AI note be attached later
-  from: string; // speaker's display name
-  transcript: string; // what speech-to-text heard
-  note?: string; // AI-simplified version, arrives after the transcript
-  at: number; // epoch ms
-};
+export const PeerInfoSchema = z.object({
+  id: z.string(), // PeerJS id, e.g. "wt-factory1-dispatch"
+  name: z.string(), // display name
+  role: RoleSchema,
+});
+export type PeerInfo = z.infer<typeof PeerInfoSchema>;
 
 // "ended-shift" = left on purpose (sent a bye), "lost-connection" = dropped without a bye.
-export type ShiftEventKind = "on-shift" | "ended-shift" | "lost-connection";
+export const ShiftEventKindSchema = z.enum([
+  "on-shift",
+  "ended-shift",
+  "lost-connection",
+]);
+export type ShiftEventKind = z.infer<typeof ShiftEventKindSchema>;
 
-export type ShiftEvent = {
-  id: string;
-  peer: PeerInfo;
-  kind: ShiftEventKind;
-  at: number; // epoch ms
-};
+export const ShiftEventSchema = z.object({
+  id: z.string(),
+  peer: PeerInfoSchema,
+  kind: ShiftEventKindSchema,
+  at: z.number(), // epoch ms
+});
+export type ShiftEvent = z.infer<typeof ShiftEventSchema>;
+
+// Messages sent over PeerJS data connections. Voice goes over media calls, not here.
+export const WireMessageSchema = z.discriminatedUnion("type", [
+  z.object({ type: z.literal("hello"), peer: PeerInfoSchema }), // member → dispatch
+  z.object({ type: z.literal("bye") }), // either side, just before leaving
+  z.object({ type: z.literal("roster"), peers: z.array(PeerInfoSchema) }), // dispatch → everyone
+  z.object({ type: z.literal("shift-log"), events: z.array(ShiftEventSchema) }), // dispatch → newcomer
+  z.object({ type: z.literal("shift-event"), event: ShiftEventSchema }), // dispatch → everyone
+]);
+export type WireMessage = z.infer<typeof WireMessageSchema>;
 
 export type ChannelStatus =
   | "idle"
   | "connecting"
   | "waiting-dispatch"
-  | "ready"
-  | "error";
+  | "ready";
 
+// What the useChannel hook gives the UI.
 export type ChannelApi = {
   status: ChannelStatus;
-  error?: string;
-  channel: string | null;
+  errorMessage: string;
   me: PeerInfo | null;
   roster: PeerInfo[]; // everyone on the channel, including me
-  speaker: PeerInfo | null; // who holds the floor (one speaker at a time), null = free
-  feed: FeedItem[]; // oldest first
   shiftLog: ShiftEvent[]; // oldest first, written by dispatch
+  hearingCount: number; // how many people's audio we are receiving
   join: (name: string, channel: string, role: Role) => Promise<void>;
-  leave: () => void;
-  startTalking: () => boolean; // false when someone else holds the floor
-  stopTalking: () => void;
-  addTranscript: (text: string) => string; // returns the new item id
-  addNote: (itemId: string, note: string) => void;
+  leave: () => Promise<void>;
 };
-
-// Messages sent over PeerJS data connections. Voice goes over media calls, not here.
-export type WireMessage =
-  | { type: "hello"; peer: PeerInfo } // member → dispatch
-  | { type: "bye"; from: string } // member → dispatch, sent just before leaving
-  | { type: "roster"; peers: PeerInfo[] } // dispatch → everyone
-  | { type: "shift-event"; event: ShiftEvent } // dispatch → everyone
-  | { type: "ptt-start"; from: string } // peer id
-  | { type: "ptt-stop"; from: string }
-  | { type: "transcript"; item: FeedItem }
-  | { type: "note"; id: string; note: string };
 
 // Dispatch is the meeting point: a predictable id members can find with just the channel code.
 export const dispatchPeerId = (channel: string): string =>
