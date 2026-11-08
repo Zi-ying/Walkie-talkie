@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "dev:lan": "vite --host --mode lan",
+    "peer:local": "peerjs --port 9000",
     "build": "tsc -b && vite build",
     "lint": "oxlint",
     "preview": "vite preview",
@@ -28,6 +29,7 @@
     "@vitejs/plugin-basic-ssl": "^2.3.0",
     "@vitejs/plugin-react": "^6.1.2",
     "oxlint": "^1.90.0",
+    "peer": "^1.0.2",
     "tailwindcss": "^4.3.5",
     "typescript": "~7.0.2",
     "vite": "^8.3.6"

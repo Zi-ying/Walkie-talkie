@@ -8,6 +8,7 @@ import type {
   MediaConnection,
   PeerError,
   PeerErrorType,
+  PeerJSOption,
 } from "peerjs";
 import type { ZodSafeParseResult } from "zod";
 import type { WireMessage } from "@/lib/types";
@@ -18,16 +19,35 @@ const CLOSE_TIMEOUT_MS: number = 1000;
 // How long a connection may stay "disconnected" before we treat the other side as gone.
 const DISCONNECTED_GRACE_MS: number = 5000;
 
+// Port of the local PeerJS server (`yarn peer:local`), when one is used.
+const LOCAL_SERVER_PORT: number = 9000;
+
 // Members get a random id on the channel; dispatch uses dispatchPeerId() from ./types.
 export const memberPeerId = (channel: string): string =>
   `wt-${channel}-${generateId()}`;
 
-// Connects to the PeerJS cloud server (signaling only, voice never goes through it)
+// Which signaling server to use. By default the free PeerJS cloud server; set VITE_PEERJS_HOST
+// (and VITE_PEERJS_PORT) to use a local one instead, e.g. `yarn peer:local` (the e2e tests do this).
+const signalingServerOptions = (): PeerJSOption => {
+  const host: string | undefined = import.meta.env.VITE_PEERJS_HOST;
+  if (host === undefined || host === "") {
+    return {};
+  }
+  const port: string | undefined = import.meta.env.VITE_PEERJS_PORT;
+  return {
+    host,
+    port: port === undefined ? LOCAL_SERVER_PORT : Number(port),
+    path: "/",
+    secure: false,
+  };
+};
+
+// Connects to the signaling server (it only introduces peers, voice never goes through it)
 // and resolves once our id is reserved.
 export const createPeer = (id: string): Promise<Peer> =>
   new Promise<Peer>(
     (resolve: (peer: Peer) => void, reject: (reason: Error) => void): void => {
-      const peer: Peer = new Peer(id);
+      const peer: Peer = new Peer(id, signalingServerOptions());
       peer.on("open", (): void => resolve(peer));
       peer.on("error", (error: PeerError<`${PeerErrorType}`>): void => {
         if (error.type === "unavailable-id") {
