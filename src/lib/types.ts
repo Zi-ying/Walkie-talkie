@@ -33,6 +33,21 @@ export const ShiftEventSchema = z.object({
 });
 export type ShiftEvent = z.infer<typeof ShiftEventSchema>;
 
+// One transmission in the feed: what was said, then the AI's short note (filled in by dispatch).
+// "pending" = Claude is writing it, "unavailable" = no API key or the call failed.
+export const NoteStatusSchema = z.enum(["pending", "ready", "unavailable"]);
+export type NoteStatus = z.infer<typeof NoteStatusSchema>;
+
+export const FeedItemSchema = z.object({
+  id: z.string(),
+  speaker: PeerInfoSchema,
+  transcript: z.string(),
+  note: z.string(),
+  noteStatus: NoteStatusSchema,
+  at: z.number(), // epoch ms
+});
+export type FeedItem = z.infer<typeof FeedItemSchema>;
+
 // Messages sent over PeerJS data connections. Voice goes over media calls, not here.
 export const WireMessageSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("hello"), peer: PeerInfoSchema }), // member → dispatch
@@ -44,6 +59,10 @@ export const WireMessageSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("talk-request") }), // member → dispatch
   z.object({ type: z.literal("talk-release") }), // member → dispatch
   z.object({ type: z.literal("floor"), speakerId: z.string().nullable() }), // dispatch → everyone
+  // Transcripts and AI notes: members send what they said, dispatch adds the note and shares the item.
+  z.object({ type: z.literal("transcript"), text: z.string() }), // member → dispatch
+  z.object({ type: z.literal("feed-item"), item: FeedItemSchema }), // dispatch → everyone (new or updated)
+  z.object({ type: z.literal("feed"), items: z.array(FeedItemSchema) }), // dispatch → newcomer
 ]);
 export type WireMessage = z.infer<typeof WireMessageSchema>;
 
@@ -63,10 +82,12 @@ export type ChannelApi = {
   hearingCount: number; // how many people's audio we are receiving
   speaker: PeerInfo | null; // who holds the floor, null = channel free
   isTalking: boolean; // I hold the floor and my mic is on
+  feed: FeedItem[]; // transmissions with their AI notes, oldest first
   join: (name: string, channel: string, role: Role) => Promise<void>;
   leave: () => Promise<void>;
   startTalking: () => void; // press: asks for the floor, ignored if someone else holds it
   stopTalking: () => void; // release
+  submitTranscript: (text: string) => void; // what I just said, as text (shared with everyone)
 };
 
 // Dispatch is the meeting point: a predictable id members can find with just the channel code.

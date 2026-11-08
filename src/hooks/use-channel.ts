@@ -32,6 +32,7 @@ import type {
 import type {
   ChannelApi,
   ChannelStatus,
+  FeedItem,
   PeerInfo,
   Role,
   ShiftEvent,
@@ -56,9 +57,19 @@ const newShiftEvent = (peer: PeerInfo, kind: ShiftEventKind): ShiftEvent => ({
   at: Date.now(),
 });
 
-// The whole channel: PeerJS connections, voice, roster and shift log.
-// Dispatch is the hub: members connect to it (data + voice), it keeps the roster and the shift log.
-export const useChannel = (): ChannelApi => {
+// Writes a short note for a transcript, or null when it can't. Injected by the app, so the radio
+// knows nothing about the AI behind it (and works the same without one).
+export type NoteWriter = (transcript: string) => Promise<string | null>;
+
+export type ChannelOptions = {
+  writeNote?: NoteWriter; // used by dispatch only; without it, notes are "unavailable"
+};
+
+// The radio: PeerJS connections, voice, push-to-talk, roster, shift log and message feed.
+// Dispatch is the hub: members connect to it (data + voice), it keeps the roster, the shift log
+// and the feed. Nothing here depends on speech recognition or on an LLM.
+export const useChannel = (options: ChannelOptions = {}): ChannelApi => {
+  const { writeNote } = options;
   const [status, setStatus] = useState<ChannelStatus>("idle");
   const [errorMessage, setErrorMessage] = useState<string>("");
   const [me, setMe] = useState<PeerInfo | null>(null);
@@ -66,6 +77,7 @@ export const useChannel = (): ChannelApi => {
   const [shiftLog, setShiftLog] = useState<ShiftEvent[]>([]);
   const [hearingCount, setHearingCount] = useState<number>(0);
   const [speakerId, setSpeakerId] = useState<string | null>(null);
+  const [feed, setFeed] = useState<FeedItem[]>([]);
 
   // Refs: PeerJS handlers are created once (at join) and must always see the latest values.
   const peerRef: RefObject<Peer | null> = useRef<Peer | null>(null);
@@ -80,6 +92,7 @@ export const useChannel = (): ChannelApi => {
   const retryTimerRef: RefObject<number | null> = useRef<number | null>(null);
   const speakerIdRef: RefObject<string | null> = useRef<string | null>(null);
   const isHoldingRef: RefObject<boolean> = useRef<boolean>(false); // push-to-talk button held down
+  const feedRef: RefObject<FeedItem[]> = useRef<FeedItem[]>([]);
   // Dispatch only
   const membersRef: RefObject<Map<string, MemberEntry>> = useRef<
     Map<string, MemberEntry>
@@ -106,6 +119,23 @@ export const useChannel = (): ChannelApi => {
 
   const appendShiftEvent = (event: ShiftEvent): void => {
     updateShiftLog([...shiftLogRef.current, event]);
+  };
+
+  const updateFeed = (items: FeedItem[]): void => {
+    feedRef.current = items;
+    setFeed(items);
+  };
+
+  // A feed item arrives twice: first with the transcript, then again once the AI note is ready.
+  const upsertFeedItem = (item: FeedItem): void => {
+    const exists: boolean = feedRef.current.some(
+      (existing: FeedItem): boolean => existing.id === item.id,
+    );
+    updateFeed(
+      exists
+        ? feedRef.current.map((existing: FeedItem): FeedItem => (existing.id === item.id ? item : existing))
+        : [...feedRef.current, item],
+    );
   };
 
   // ---------- Audio ----------
@@ -157,6 +187,20 @@ export const useChannel = (): ChannelApi => {
     }
   };
 
+  // Text of what we just said (from any source, e.g. speech-to-text): shared with everyone
+  // through dispatch, which may add a note to it (see `writeNote`).
+  const submitTranscript = (text: string): void => {
+    const self: PeerInfo | null = meRef.current;
+    if (text === "" || self === null || isLeavingRef.current) {
+      return;
+    }
+    if (self.role === "dispatch") {
+      void publishTranscript(self, text);
+    } else {
+      sendToDispatch({ type: "transcript", text });
+    }
+  };
+
   // ---------- Dispatch side ----------
 
   const broadcast = (message: WireMessage): void => {
@@ -186,6 +230,37 @@ export const useChannel = (): ChannelApi => {
     broadcast({ type: "shift-event", event });
   };
 
+  const shareFeedItem = (item: FeedItem): void => {
+    upsertFeedItem(item);
+    broadcast({ type: "feed-item", item });
+  };
+
+  // Dispatch shares the transcript right away, then asks `writeNote` for the note (if the app gave
+  // one) and shares the item again with it. A missing or failing note never blocks the transcript.
+  const publishTranscript = async (speaker: PeerInfo, transcript: string): Promise<void> => {
+    const item: FeedItem = {
+      id: generateId(),
+      speaker,
+      transcript,
+      note: "",
+      noteStatus: writeNote === undefined ? "unavailable" : "pending",
+      at: Date.now(),
+    };
+    shareFeedItem(item);
+    if (writeNote === undefined) {
+      return;
+    }
+    const note: string | null = await writeNote(transcript);
+    if (isLeavingRef.current) {
+      return;
+    }
+    shareFeedItem(
+      note === null
+        ? { ...item, noteStatus: "unavailable" }
+        : { ...item, note, noteStatus: "ready" },
+    );
+  };
+
   const handleMemberMessage = (connection: DataConnection, message: WireMessage): void => {
     switch (message.type) {
       case "hello": {
@@ -196,6 +271,7 @@ export const useChannel = (): ChannelApi => {
         recordShiftEvent(info, "on-shift");
         publishRoster();
         sendMessage(connection, { type: "floor", speakerId: speakerIdRef.current });
+        sendMessage(connection, { type: "feed", items: feedRef.current });
         break;
       }
       case "bye": {
@@ -216,8 +292,15 @@ export const useChannel = (): ChannelApi => {
           grantFloor(null);
         }
         break;
+      case "transcript": {
+        const member: MemberEntry | undefined = membersRef.current.get(connection.peer);
+        if (member !== undefined) {
+          void publishTranscript(member.info, message.text);
+        }
+        break;
+      }
       default:
-        // roster, shift-log, shift-event and floor only go from dispatch to members.
+        // roster, shift-log, shift-event, floor, feed-item and feed only go from dispatch to members.
         break;
     }
   };
@@ -356,8 +439,14 @@ export const useChannel = (): ChannelApi => {
       case "floor":
         applyFloor(message.speakerId);
         break;
+      case "feed-item":
+        upsertFeedItem(message.item);
+        break;
+      case "feed":
+        updateFeed(message.items);
+        break;
       default:
-        // hello, talk-request and talk-release only go from members to dispatch.
+        // hello, talk-request, talk-release and transcript only go from members to dispatch.
         break;
     }
   };
@@ -426,6 +515,7 @@ export const useChannel = (): ChannelApi => {
     setSpeakerId(null);
     updateRoster([]);
     updateShiftLog([]);
+    updateFeed([]);
     try {
       // Ask for the mic first: this runs inside the Join click, which browsers require.
       microphoneRef.current = await getMicrophone();
@@ -554,9 +644,11 @@ export const useChannel = (): ChannelApi => {
     hearingCount,
     speaker,
     isTalking,
+    feed,
     join,
     leave,
     startTalking,
     stopTalking,
+    submitTranscript,
   };
 };
