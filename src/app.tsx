@@ -1,20 +1,12 @@
-import { useState } from "react";
-
-import { FeedEntry } from "@/components/feed-entry";
-import { NoteBanner } from "@/components/note-banner";
-import { PushToTalkButton } from "@/components/push-to-talk-button";
-import { RosterItem } from "@/components/roster-item";
-import { ShiftLogItem } from "@/components/shift-log-item";
+import { ChannelScreen } from "@/components/channel-screen";
+import { JoinScreen } from "@/components/join-screen";
 import { useChannel } from "@/hooks/use-channel";
 import { useTranscription } from "@/hooks/use-transcription";
 import { isLlmAvailable, writeSimpleNote } from "@/lib/llm";
-import { isTranscriptionSupported } from "@/lib/speech";
-import { isRole } from "@/lib/types";
 
-import type { ChangeEvent, JSX } from "react";
-import type { ChannelApi, FeedItem, PeerInfo, Role, ShiftEvent } from "@/lib/types";
+import type { JSX } from "react";
+import type { ChannelApi, Role } from "@/lib/types";
 
-// Temporary test screen for the PeerJS steps. The real UI comes later.
 const App = (): JSX.Element => {
   // The radio, the speech-to-text and the AI are separate pieces, put together only here.
   // Without an API key, no note writer is given and the radio works the same, without notes.
@@ -22,168 +14,28 @@ const App = (): JSX.Element => {
     writeNote: isLlmAvailable() ? writeSimpleNote : undefined,
   });
   useTranscription(channelApi.isTalking, channelApi.submitTranscript);
-  const { status, errorMessage, me, roster, shiftLog, hearingCount, speaker, isTalking, feed } =
-    channelApi;
 
-  const [name, setName] = useState<string>("");
-  const [channel, setChannel] = useState<string>("factory1");
-  const [role, setRole] = useState<Role>("member");
+  const isOnChannel: boolean = channelApi.status !== "idle";
+  const isDispatch: boolean = channelApi.me !== null && channelApi.me.role === "dispatch";
 
-  const isDispatch: boolean = role === "dispatch";
-  const isConnected: boolean = status !== "idle";
-  const isConnecting: boolean = status === "connecting";
-  const isWaitingForDispatch: boolean = status === "waiting-dispatch";
-  const canJoin: boolean = name !== "" && !isConnected;
-  const hasError: boolean = errorMessage !== "";
-
-  const myId: string = me === null ? "" : me.id;
-  const isReady: boolean = status === "ready" && myId !== "";
-  const leaveLabel: string = isDispatch ? "Close channel" : "End shift";
-  const hearingLabel: string = `🔊 Hearing ${hearingCount} ${hearingCount === 1 ? "person" : "people"}`;
-
-  const isBusy: boolean = speaker !== null && !isTalking;
-  const canTalk: boolean = status === "ready" && !isBusy;
-  const speakerLabel: string = speaker === null ? "Channel free" : `🔴 ${speaker.name} is talking`;
-
-  const showTranscriptionHint: boolean = isReady && !isTranscriptionSupported();
-  const showNoApiKeyHint: boolean = isReady && isDispatch && !isLlmAvailable();
-
-  const readyNotes: FeedItem[] = feed.filter(
-    (item: FeedItem): boolean => item.noteStatus === "ready",
-  );
-  const latestNote: FeedItem | null =
-    readyNotes.length === 0 ? null : readyNotes[readyNotes.length - 1];
-  const noteBanner: JSX.Element | null =
-    latestNote === null ? null : <NoteBanner item={latestNote} />;
-
-  const isMyself = (peer: PeerInfo): boolean => peer.id === myId;
-
-  const join = async (): Promise<void> => {
-    await channelApi.join(name, channel, role);
+  const join = (name: string, channel: string, role: Role): void => {
+    void channelApi.join(name, channel, role);
   };
 
   // Leaving is deliberate: members end their shift, dispatch closes the channel for everyone.
-  const leave = async (): Promise<void> => {
+  const leave = (): void => {
     const question: string = isDispatch
       ? "Close the channel? Everyone will be disconnected."
       : "End your shift? Dispatch will see you as off duty.";
     if (window.confirm(question)) {
-      await channelApi.leave();
+      void channelApi.leave();
     }
   };
 
-  const handleNameChange = (event: ChangeEvent<HTMLInputElement>): void => {
-    setName(event.target.value);
-  };
-
-  const handleChannelChange = (event: ChangeEvent<HTMLInputElement>): void => {
-    setChannel(event.target.value);
-  };
-
-  const handleRoleChange = (event: ChangeEvent<HTMLSelectElement>): void => {
-    const value: string = event.target.value;
-    if (isRole(value)) {
-      setRole(value);
-    }
-  };
-
-  return (
-    <main className="min-h-screen bg-zinc-900 text-zinc-100 p-6 flex flex-col gap-3 max-w-sm">
-      <h1 className="text-2xl font-bold">📻 Walkie-Talkie (test)</h1>
-      <input
-        className="bg-zinc-800 p-2 rounded"
-        placeholder="Name"
-        aria-label="Name"
-        value={name}
-        disabled={isConnected}
-        onChange={handleNameChange}
-      />
-      <input
-        className="bg-zinc-800 p-2 rounded"
-        placeholder="Channel"
-        aria-label="Channel"
-        value={channel}
-        disabled={isConnected}
-        onChange={handleChannelChange}
-      />
-      <select
-        className="bg-zinc-800 p-2 rounded"
-        aria-label="Role"
-        value={role}
-        disabled={isConnected}
-        onChange={handleRoleChange}
-      >
-        <option value="member">Member</option>
-        <option value="dispatch">Dispatch</option>
-      </select>
-      {isConnected ? (
-        <button className="bg-zinc-700 p-2 rounded font-bold" onClick={leave}>
-          {leaveLabel}
-        </button>
-      ) : (
-        <button
-          className="bg-orange-600 p-2 rounded font-bold disabled:opacity-40"
-          disabled={!canJoin}
-          onClick={join}
-        >
-          Join
-        </button>
-      )}
-
-      {isConnecting && <p className="text-zinc-400">Connecting…</p>}
-      {isWaitingForDispatch && (
-        <p className="text-amber-400">⏳ Waiting for dispatch…</p>
-      )}
-      {isReady && <p className="text-green-400">Connected as {myId}</p>}
-      {isConnected && <p>{hearingLabel}</p>}
-      {isReady && <p className="font-bold">{speakerLabel}</p>}
-      {isReady && (
-        <PushToTalkButton
-          isTalking={isTalking}
-          isBusy={isBusy}
-          isDisabled={!canTalk}
-          onStart={channelApi.startTalking}
-          onStop={channelApi.stopTalking}
-        />
-      )}
-      {hasError && <p className="text-red-400">{errorMessage}</p>}
-      {showTranscriptionHint && (
-        <p className="text-zinc-500 text-sm">Transcription only works in Chrome or Edge.</p>
-      )}
-      {showNoApiKeyHint && (
-        <p className="text-zinc-500 text-sm">
-          AI notes are off: add VITE_ANTHROPIC_API_KEY to .env to turn them on.
-        </p>
-      )}
-
-      {noteBanner}
-
-      <h2 className="text-lg font-bold mt-4">Messages</h2>
-      <ul className="flex flex-col gap-3 text-sm" aria-label="Messages">
-        {feed.map(
-          (item: FeedItem): JSX.Element => <FeedEntry key={item.id} item={item} />,
-        )}
-      </ul>
-
-      <h2 className="text-lg font-bold mt-4">On the channel</h2>
-      <ul className="flex flex-col gap-1 text-sm" aria-label="On the channel">
-        {roster.map(
-          (peer: PeerInfo): JSX.Element => (
-            <RosterItem key={peer.id} peer={peer} isMe={isMyself(peer)} />
-          ),
-        )}
-      </ul>
-
-      <h2 className="text-lg font-bold mt-4">Shift log</h2>
-      <ul className="flex flex-col gap-1 text-sm" aria-label="Shift log">
-        {shiftLog.map(
-          (event: ShiftEvent): JSX.Element => (
-            <ShiftLogItem key={event.id} event={event} />
-          ),
-        )}
-      </ul>
-    </main>
-  );
+  if (!isOnChannel) {
+    return <JoinScreen errorMessage={channelApi.errorMessage} onJoin={join} />;
+  }
+  return <ChannelScreen channelApi={channelApi} onLeave={leave} />;
 };
 
 export default App;

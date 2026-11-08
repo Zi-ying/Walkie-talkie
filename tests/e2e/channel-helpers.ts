@@ -16,11 +16,12 @@ export const joinChannel = async (
   page: Page,
   { name, channel, role }: JoinOptions,
 ): Promise<void> => {
+  const roleLabel: string = role === "dispatch" ? "Dispatch" : "Member";
   await page.goto("/");
-  await page.getByLabel("Name", { exact: true }).fill(name);
+  await page.getByLabel("Your name", { exact: true }).fill(name);
   await page.getByLabel("Channel", { exact: true }).fill(channel);
-  await page.getByLabel("Role", { exact: true }).selectOption(role);
-  await page.getByRole("button", { name: "Join" }).click();
+  await page.getByRole("radio", { name: roleLabel, exact: true }).click();
+  await page.getByRole("button", { name: "Join channel" }).click();
 };
 
 // Accepts the "End your shift?" / "Close the channel?" confirmation.
