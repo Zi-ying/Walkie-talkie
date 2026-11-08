@@ -12,6 +12,16 @@ yarn dev
 
 Open two Chrome tabs: one as Dispatch, one as Member, on the same channel code.
 
+### On several laptops (same Wi-Fi)
+
+Browsers only allow the microphone on `https://` pages or `localhost`, so serve over HTTPS on the local network:
+
+```bash
+yarn dev:lan
+```
+
+Open the `Network: https://…` address it prints on every laptop. The certificate is self-signed, so the browser warns once: choose "Advanced → Proceed". Voice is peer-to-peer; PeerJS's default STUN and free TURN servers help laptops connect, even across networks.
+
 ## Tests
 
 ```bash
