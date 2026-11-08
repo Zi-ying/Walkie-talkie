@@ -1,6 +1,6 @@
 import { useState } from "react";
 
-import { ChannelScreen } from "@/components/channel-screen";
+import { DispatchView } from "@/components/dispatch-view";
 import { JoinScreen } from "@/components/join-screen";
 import { MemberView } from "@/components/member-view";
 import { useChannel } from "@/hooks/use-channel";
@@ -45,7 +45,7 @@ const App = (): JSX.Element => {
     return <JoinScreen errorMessage={channelApi.errorMessage} onJoin={join} />;
   }
   if (isDispatch) {
-    return <ChannelScreen channelApi={channelApi} onLeave={leave} />;
+    return <DispatchView channelApi={channelApi} channelName={channelName} onLeave={leave} />;
   }
   return <MemberView channelApi={channelApi} channelName={channelName} onLeave={leave} />;
 };

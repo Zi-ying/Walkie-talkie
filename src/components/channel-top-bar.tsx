@@ -57,13 +57,16 @@ export const ChannelTopBar = ({
         </span>
       </div>
 
-      <ul className="flex flex-1 justify-end -space-x-1 overflow-x-auto py-1" aria-label="Online">
-        {roster.map(
-          (peer: PeerInfo): JSX.Element => (
-            <Avatar key={peer.id} peer={peer} isSpeaking={isSpeaking(peer)} />
-          ),
-        )}
-      </ul>
+      {/* Right-aligned, and scrolls sideways (instead of clipping) when there are many people. */}
+      <div className="flex min-w-0 flex-1 justify-end">
+        <ul className="flex min-w-0 -space-x-1 overflow-x-auto p-1" aria-label="Online">
+          {roster.map(
+            (peer: PeerInfo): JSX.Element => (
+              <Avatar key={peer.id} peer={peer} isSpeaking={isSpeaking(peer)} />
+            ),
+          )}
+        </ul>
+      </div>
 
       <button
         type="button"

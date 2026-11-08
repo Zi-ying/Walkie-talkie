@@ -12,26 +12,40 @@ const noteText = (item: FeedItem): string => {
     case "pending":
       return "✍️ Writing note…";
     case "ready":
-      return `📝 ${item.note}`;
+      return item.note;
     case "unavailable":
       return "AI note unavailable";
   }
 };
 
+// Dispatch's view of one transmission: the AI note first, and the original words one click away
+// (to catch AI mistakes). Without a note, the original words are shown directly.
 export const FeedEntry = ({ item }: FeedEntryProps): JSX.Element => {
-  const time: string = new Date(item.at).toLocaleTimeString();
+  const time: string = new Date(item.at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
   const note: string = noteText(item);
   const isNoteReady: boolean = item.noteStatus === "ready";
-  const noteClassName: string = cn({ "text-amber-300": isNoteReady, "text-zinc-500": !isNoteReady });
+  const transcript: string = `“${item.transcript}”`;
+  const noteClassName: string = cn({
+    "text-base font-bold text-amber-300": isNoteReady,
+    "text-xs text-zinc-500": !isNoteReady,
+  });
+  const originalWords: JSX.Element = isNoteReady ? (
+    <details className="text-sm">
+      <summary className="cursor-pointer text-xs text-zinc-500">Show original words</summary>
+      <p className="mt-1 text-zinc-400">{transcript}</p>
+    </details>
+  ) : (
+    <p className="text-sm text-zinc-300">{transcript}</p>
+  );
 
   return (
-    <li className="flex flex-col gap-1 border-l-2 border-zinc-700 pl-3">
-      <div className="flex gap-2 text-zinc-500">
-        <span>{time}</span>
+    <li className="flex flex-col gap-1 rounded-xl bg-zinc-900 p-3">
+      <div className="flex justify-between text-xs text-zinc-500">
         <span className="font-bold text-zinc-300">{item.speaker.name}</span>
+        <span>{time}</span>
       </div>
-      <p className="text-zinc-400">“{item.transcript}”</p>
       <p className={noteClassName}>{note}</p>
+      {originalWords}
     </li>
   );
 };

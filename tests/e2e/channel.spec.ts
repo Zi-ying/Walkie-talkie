@@ -14,7 +14,7 @@ test("dispatch and member hear each other; members see who's online, dispatch se
   const member: Page = await context.newPage();
 
   await joinChannel(dispatch, { name: "Ana", channel, role: "dispatch" });
-  await expect(dispatch.getByText(`Connected as wt-${channel}-dispatch`)).toBeVisible();
+  await expect(dispatch.getByText("Connected", { exact: true })).toBeVisible();
 
   await joinChannel(member, { name: "Bob", channel, role: "member" });
 
@@ -79,7 +79,7 @@ test("a second dispatch on the same channel is refused", async ({
   const secondDispatch: Page = await context.newPage();
 
   await joinChannel(firstDispatch, { name: "Ana", channel, role: "dispatch" });
-  await expect(firstDispatch.getByText("Connected as")).toBeVisible();
+  await expect(firstDispatch.getByText("Connected", { exact: true })).toBeVisible();
 
   await joinChannel(secondDispatch, { name: "Eve", channel, role: "dispatch" });
   await expect(secondDispatch.getByText("already taken")).toBeVisible();

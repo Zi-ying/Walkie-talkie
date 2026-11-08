@@ -2,7 +2,11 @@
 
 A push-to-talk radio in the browser for teams without reliable phone coverage (factories, hospitals). People join a channel with a code; one person is Dispatch, the others are members. Hold the button to talk, one speaker at a time. Every transmission is transcribed, and an LLM rewrites it as a short, simple note for people who can't hear the audio.
 
-Built in a few hours as a frontend-only MVP (React, TypeScript, PeerJS/WebRTC). The sections below explain how to run it, how it works, and how the full system would look.
+Built in a few hours as a frontend-only MVP (React, TypeScript, Tailwind, PeerJS/WebRTC). The sections below explain how to run it, how it works, and how the full system would look.
+
+**Two views, for phone and desktop:**
+- **Member** (simple, hands busy): the latest AI note in a big banner, who's talking, a big push-to-talk button, and who's online as avatars in the top bar (a green ring around whoever is speaking). AI notes only: no transcripts, no lists to manage.
+- **Dispatch** (the overview): the team and the shift log, the talk panel, and every note with its original words one click away (to catch AI mistakes). Three columns on desktop, a bottom tab bar (Team / Talk / Notes) on phones.
 
 ## How to run
 
@@ -117,7 +121,6 @@ The key is used from Dispatch's browser, so anyone who opens the page could read
 ## If I had more time
 
 - **Split `use-channel.ts`:** the hook does five jobs (connection, voice mesh, Dispatch hub, member link, feed) in ~650 lines. Plan: plain TypeScript modules per job (`connection.ts`, `voice-mesh.ts`, `dispatch-hub.ts`, `member-link.ts`) and a thin hook that only mirrors their state into React, each module unit-tested on its own; the e2e tests guard the behaviour during the split.
-- **A real UI:** a proper join screen, a simple member view (big push-to-talk button, latest note) and a Dispatch view (roster, shift log, full feed). The MVP shows everything on one test screen.
 - **Admin page and registered members:** an admin creates channels and registers members ahead of time, so each person has a fixed id assigned once (not a random one per session). Only registered members can join a channel, and channel names are created and validated by the admin rather than typed freely (the MVP accepts any channel name, and PeerJS rejects names with characters outside `A-Z a-z 0-9 - _`). This needs a backend: a member registry, authentication, and a signaling server that checks membership before connecting peers.
 - **A backend for the AI and the text messages:** a small server holds the Claude API key (never shipped to browsers) and makes the Claude call. A WebSocket service carries the text messages (transcripts, notes, roster, shift log) with history, so people who were offline catch up, while voice stays on WebRTC. The MVP is frontend-only, so text goes over WebRTC data channels between browsers instead.
 - **Private speech-to-text:** Chrome's Web Speech API sends the audio to Google's servers to recognise it, which is a real concern in a hospital. Replace it with a self-hosted speech model (e.g. Whisper) on the backend, which would also work in every browser.
