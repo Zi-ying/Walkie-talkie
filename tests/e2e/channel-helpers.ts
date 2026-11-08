@@ -32,6 +32,11 @@ export const expectHearing = async (page: Page, count: number): Promise<void> =>
   await expect(page.getByLabel(label, { exact: true })).toBeVisible();
 };
 
+// Unfolds a collapsible section (e.g. "Shift log"), like a user clicking its title.
+export const openSection = async (page: Page, title: string): Promise<void> => {
+  await page.locator("summary", { hasText: title }).click();
+};
+
 // Accepts the "End your shift?" / "Close the channel?" confirmation.
 export const leaveChannel = async (page: Page): Promise<void> => {
   page.once("dialog", (dialog: Dialog): void => {

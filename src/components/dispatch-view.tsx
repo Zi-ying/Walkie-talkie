@@ -1,6 +1,7 @@
 import { useState } from "react";
 
 import { ChannelTopBar } from "@/components/channel-top-bar";
+import { CollapsibleSection } from "@/components/collapsible-section";
 import { FeedEntry } from "@/components/feed-entry";
 import { RosterItem } from "@/components/roster-item";
 import { ShiftLogItem } from "@/components/shift-log-item";
@@ -47,6 +48,7 @@ export const DispatchView = ({ channelApi, channelName, onLeave }: DispatchViewP
   const latestShiftEventsFirst: ShiftEvent[] = [...shiftLog].reverse();
   const isNotesEmpty: boolean = messages.length === 0;
   const teamTitle: string = `On the channel (${roster.length})`;
+  const shiftLogTitle: string = `Shift log (${shiftLog.length})`;
 
   // On phones only the active panel shows; from md up all three show side by side.
   const panelClassName = (tab: DispatchTab): string =>
@@ -74,21 +76,23 @@ export const DispatchView = ({ channelApi, channelName, onLeave }: DispatchViewP
 
       <div className="grid min-h-0 flex-1 md:grid-cols-[16rem_1fr_20rem]">
         <section className={teamPanelClassName} aria-label="Team">
-          <h2 className="text-xs font-bold uppercase tracking-wide text-zinc-500">{teamTitle}</h2>
-          <ul className="flex flex-col gap-2 text-sm" aria-label="On the channel">
-            {roster.map(
-              (peer: PeerInfo): JSX.Element => (
-                <RosterItem key={peer.id} peer={peer} isMe={isMyself(peer)} isSpeaking={isSpeaking(peer)} />
-              ),
-            )}
-          </ul>
+          <CollapsibleSection title={teamTitle}>
+            <ul className="flex flex-col gap-2 text-sm" aria-label="On the channel">
+              {roster.map(
+                (peer: PeerInfo): JSX.Element => (
+                  <RosterItem key={peer.id} peer={peer} isMe={isMyself(peer)} isSpeaking={isSpeaking(peer)} />
+                ),
+              )}
+            </ul>
+          </CollapsibleSection>
 
-          <h2 className="mt-4 text-xs font-bold uppercase tracking-wide text-zinc-500">Shift log</h2>
-          <ul className="flex flex-col gap-1 text-xs" aria-label="Shift log">
-            {latestShiftEventsFirst.map(
-              (event: ShiftEvent): JSX.Element => <ShiftLogItem key={event.id} event={event} />,
-            )}
-          </ul>
+          <CollapsibleSection title={shiftLogTitle}>
+            <ul className="flex flex-col gap-1 text-xs" aria-label="Shift log">
+              {latestShiftEventsFirst.map(
+                (event: ShiftEvent): JSX.Element => <ShiftLogItem key={event.id} event={event} />,
+              )}
+            </ul>
+          </CollapsibleSection>
         </section>
 
         <section className={talkPanelClassName} aria-label="Talk">

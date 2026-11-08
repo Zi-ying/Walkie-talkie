@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-import { expectHearing, joinChannel, leaveChannel, uniqueChannel } from "./channel-helpers.ts";
+import { expectHearing, joinChannel, leaveChannel, openSection, uniqueChannel } from "./channel-helpers.ts";
 
 import type { BrowserContext, Locator, Page } from "@playwright/test";
 
@@ -27,6 +27,7 @@ test("dispatch and member hear each other; members see who's online, dispatch se
   await expect(memberOnline.getByLabel("Bob")).toBeVisible();
   await expect(member.getByRole("list", { name: "Shift log" })).toHaveCount(0);
 
+  await openSection(dispatch, "Shift log");
   const dispatchLog: Locator = dispatch.getByRole("list", { name: "Shift log" });
   await expect(dispatchLog).toContainText("Ana");
   await expect(dispatchLog).toContainText("Bob");
@@ -98,6 +99,8 @@ test("a member ending their shift is logged as ended shift for dispatch", async 
 
   await leaveChannel(member);
 
+  await openSection(dispatch, "Shift log");
+  await openSection(dispatch, "On the channel");
   const dispatchLog = dispatch.getByRole("list", { name: "Shift log" });
   await expect(dispatchLog).toContainText("ended shift");
   await expect(dispatchLog).not.toContainText("lost connection");
@@ -118,6 +121,7 @@ test("closing the tab is logged as lost connection for dispatch", async ({
 
   await member.close();
 
+  await openSection(dispatch, "Shift log");
   await expect(dispatch.getByRole("list", { name: "Shift log" })).toContainText(
     "lost connection",
     { timeout: 45000 },
