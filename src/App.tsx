@@ -1,5 +1,6 @@
 import { useState } from "react";
 
+import { ShiftLogItem } from "./components/ShiftLogItem";
 import { generateId } from "./lib/ids";
 import { createPeer, memberPeerId } from "./lib/peer";
 import { dispatchPeerId, isRole } from "./lib/types";
@@ -12,18 +13,6 @@ import type {
   ShiftEvent,
   ShiftEventKind,
 } from "./lib/types";
-
-const shiftEventText = (event: ShiftEvent): string => {
-  const who: string = `${event.peer.name} (${event.peer.id})`;
-  switch (event.kind) {
-    case "on-shift":
-      return `${who} is on shift`;
-    case "ended-shift":
-      return `${who} ended shift`;
-    case "lost-connection":
-      return `⚠ ${who} lost connection`;
-  }
-};
 
 // Temporary test screen for the PeerJS steps. The real UI comes later.
 const App = (): JSX.Element => {
@@ -140,12 +129,7 @@ const App = (): JSX.Element => {
       <ul className="flex flex-col gap-1 text-sm">
         {shiftLog.map(
           (event: ShiftEvent): JSX.Element => (
-            <li key={event.id}>
-              <span className="text-zinc-500">
-                {new Date(event.at).toLocaleTimeString()}
-              </span>{" "}
-              {shiftEventText(event)}
-            </li>
+            <ShiftLogItem key={event.id} event={event} />
           ),
         )}
       </ul>
