@@ -5,8 +5,8 @@ import {
   playRemoteStream,
   stopAudio,
   stopStream,
-} from "../lib/audio";
-import { generateId } from "../lib/ids";
+} from "@/lib/audio";
+import { generateId } from "@/lib/ids";
 import {
   answerCalls,
   callPeer,
@@ -17,8 +17,8 @@ import {
   parseMessage,
   sendAndClose,
   sendMessage,
-} from "../lib/peer";
-import { dispatchPeerId } from "../lib/types";
+} from "@/lib/peer";
+import { dispatchPeerId } from "@/lib/types";
 
 import type { RefObject } from "react";
 import type {
@@ -36,7 +36,7 @@ import type {
   ShiftEvent,
   ShiftEventKind,
   WireMessage,
-} from "../lib/types";
+} from "@/lib/types";
 
 // How long a member waits before trying dispatch again when it isn't online.
 const RETRY_DELAY_MS: number = 3000;

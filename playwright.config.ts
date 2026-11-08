@@ -4,6 +4,7 @@ import { defineConfig, devices } from "@playwright/test";
 // Chrome's fake media flags give every page a fake microphone (a test tone), with no permission prompt.
 export default defineConfig({
   testDir: "./tests/e2e",
+  tsconfig: "./tsconfig.node.json", // for the "@/..." import alias
   timeout: 60000,
   expect: { timeout: 15000 },
   workers: 2,

@@ -1,12 +1,12 @@
 import { useState } from "react";
 
-import { RosterItem } from "./components/roster-item";
-import { ShiftLogItem } from "./components/shift-log-item";
-import { useChannel } from "./hooks/use-channel";
-import { isRole } from "./lib/types";
+import { RosterItem } from "@/components/roster-item";
+import { ShiftLogItem } from "@/components/shift-log-item";
+import { useChannel } from "@/hooks/use-channel";
+import { isRole } from "@/lib/types";
 
 import type { ChangeEvent, JSX } from "react";
-import type { ChannelApi, PeerInfo, Role, ShiftEvent } from "./lib/types";
+import type { ChannelApi, PeerInfo, Role, ShiftEvent } from "@/lib/types";
 
 // Temporary test screen for the PeerJS steps. The real UI comes later.
 const App = (): JSX.Element => {

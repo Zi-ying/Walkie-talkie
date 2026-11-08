@@ -1,7 +1,7 @@
-import { generateId } from "../../src/lib/ids.ts";
+import { generateId } from "@/lib/ids.ts";
 
 import type { Dialog, Page } from "@playwright/test";
-import type { Role } from "../../src/lib/types.ts";
+import type { Role } from "@/lib/types.ts";
 
 interface JoinOptions {
   name: string;

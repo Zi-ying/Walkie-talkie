@@ -13,6 +13,11 @@
     "moduleDetection": "force",
     "noEmit": true,
 
+    /* Imports: "@/lib/ids.ts" → "src/lib/ids.ts" (Playwright reads this file, see playwright.config.ts) */
+    "paths": {
+      "@/*": ["./src/*"]
+    },
+
     /* Linting */
     "noUnusedLocals": true,
     "noUnusedParameters": true,

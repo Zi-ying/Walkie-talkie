@@ -1,7 +1,7 @@
 import { Peer } from "peerjs";
 
-import { generateId } from "./ids";
-import { WireMessageSchema } from "./types";
+import { generateId } from "@/lib/ids";
+import { WireMessageSchema } from "@/lib/types";
 
 import type {
   DataConnection,
@@ -10,7 +10,7 @@ import type {
   PeerErrorType,
 } from "peerjs";
 import type { ZodSafeParseResult } from "zod";
-import type { WireMessage } from "./types";
+import type { WireMessage } from "@/lib/types";
 
 // How long to wait for a flushed close before giving up and destroying anyway.
 const CLOSE_TIMEOUT_MS: number = 1000;

@@ -1,5 +1,5 @@
 import type { JSX } from "react";
-import type { ShiftEvent } from "../lib/types";
+import type { ShiftEvent } from "@/lib/types";
 
 interface ShiftLogItemProps {
   event: ShiftEvent;

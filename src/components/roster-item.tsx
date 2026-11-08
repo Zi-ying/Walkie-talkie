@@ -1,5 +1,5 @@
 import type { JSX } from "react";
-import type { PeerInfo } from "../lib/types";
+import type { PeerInfo } from "@/lib/types";
 
 interface RosterItemProps {
   peer: PeerInfo;
