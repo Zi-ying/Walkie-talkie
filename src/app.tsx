@@ -1,18 +1,28 @@
 import { useState } from "react";
 
+import { FeedEntry } from "@/components/feed-entry";
+import { NoteBanner } from "@/components/note-banner";
 import { PushToTalkButton } from "@/components/push-to-talk-button";
 import { RosterItem } from "@/components/roster-item";
 import { ShiftLogItem } from "@/components/shift-log-item";
 import { useChannel } from "@/hooks/use-channel";
+import { useTranscription } from "@/hooks/use-transcription";
+import { isLlmAvailable, writeSimpleNote } from "@/lib/llm";
+import { isTranscriptionSupported } from "@/lib/speech";
 import { isRole } from "@/lib/types";
 
 import type { ChangeEvent, JSX } from "react";
-import type { ChannelApi, PeerInfo, Role, ShiftEvent } from "@/lib/types";
+import type { ChannelApi, FeedItem, PeerInfo, Role, ShiftEvent } from "@/lib/types";
 
 // Temporary test screen for the PeerJS steps. The real UI comes later.
 const App = (): JSX.Element => {
-  const channelApi: ChannelApi = useChannel();
-  const { status, errorMessage, me, roster, shiftLog, hearingCount, speaker, isTalking } =
+  // The radio, the speech-to-text and the AI are separate pieces, put together only here.
+  // Without an API key, no note writer is given and the radio works the same, without notes.
+  const channelApi: ChannelApi = useChannel({
+    writeNote: isLlmAvailable() ? writeSimpleNote : undefined,
+  });
+  useTranscription(channelApi.isTalking, channelApi.submitTranscript);
+  const { status, errorMessage, me, roster, shiftLog, hearingCount, speaker, isTalking, feed } =
     channelApi;
 
   const [name, setName] = useState<string>("");
@@ -34,6 +44,17 @@ const App = (): JSX.Element => {
   const isBusy: boolean = speaker !== null && !isTalking;
   const canTalk: boolean = status === "ready" && !isBusy;
   const speakerLabel: string = speaker === null ? "Channel free" : `🔴 ${speaker.name} is talking`;
+
+  const showTranscriptionHint: boolean = isReady && !isTranscriptionSupported();
+  const showNoApiKeyHint: boolean = isReady && isDispatch && !isLlmAvailable();
+
+  const readyNotes: FeedItem[] = feed.filter(
+    (item: FeedItem): boolean => item.noteStatus === "ready",
+  );
+  const latestNote: FeedItem | null =
+    readyNotes.length === 0 ? null : readyNotes[readyNotes.length - 1];
+  const noteBanner: JSX.Element | null =
+    latestNote === null ? null : <NoteBanner item={latestNote} />;
 
   const isMyself = (peer: PeerInfo): boolean => peer.id === myId;
 
@@ -126,6 +147,23 @@ const App = (): JSX.Element => {
         />
       )}
       {hasError && <p className="text-red-400">{errorMessage}</p>}
+      {showTranscriptionHint && (
+        <p className="text-zinc-500 text-sm">Transcription only works in Chrome or Edge.</p>
+      )}
+      {showNoApiKeyHint && (
+        <p className="text-zinc-500 text-sm">
+          AI notes are off: add VITE_ANTHROPIC_API_KEY to .env to turn them on.
+        </p>
+      )}
+
+      {noteBanner}
+
+      <h2 className="text-lg font-bold mt-4">Messages</h2>
+      <ul className="flex flex-col gap-3 text-sm" aria-label="Messages">
+        {feed.map(
+          (item: FeedItem): JSX.Element => <FeedEntry key={item.id} item={item} />,
+        )}
+      </ul>
 
       <h2 className="text-lg font-bold mt-4">On the channel</h2>
       <ul className="flex flex-col gap-1 text-sm" aria-label="On the channel">
