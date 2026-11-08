@@ -1,3 +1,5 @@
+import { cn } from "@/lib/cn";
+
 import type { JSX } from "react";
 
 interface PushToTalkButtonProps {
@@ -27,11 +29,14 @@ export const PushToTalkButton = ({
   onStop,
 }: PushToTalkButtonProps): JSX.Element => {
   const label: string = buttonLabel(isTalking, isBusy);
-  const colors: string = isTalking ? "bg-red-600" : "bg-orange-600";
+  const className: string = cn(
+    "p-6 rounded-full font-bold text-lg select-none touch-none disabled:opacity-40",
+    { "bg-red-600": isTalking, "bg-orange-600": !isTalking },
+  );
 
   return (
     <button
-      className={`${colors} p-6 rounded-full font-bold text-lg select-none touch-none disabled:opacity-40`}
+      className={className}
       disabled={isDisabled}
       onPointerDown={onStart}
       onPointerUp={onStop}

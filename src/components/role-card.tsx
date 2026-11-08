@@ -1,3 +1,5 @@
+import { cn } from "@/lib/cn";
+
 import type { JSX } from "react";
 import type { Role } from "@/lib/types";
 
@@ -15,9 +17,13 @@ const ROLE_DETAILS: Record<Role, { icon: string; label: string; description: str
 // One of the two big role choices on the join screen (behaves as a radio button).
 export const RoleCard = ({ role, isSelected, onSelect }: RoleCardProps): JSX.Element => {
   const { icon, label, description } = ROLE_DETAILS[role];
-  const colors: string = isSelected
-    ? "border-orange-500 bg-orange-500/10"
-    : "border-zinc-700 hover:border-zinc-500";
+  const className: string = cn(
+    "flex flex-col items-center gap-1 rounded-xl border-2 p-4 transition-colors",
+    {
+      "border-orange-500 bg-orange-500/10": isSelected,
+      "border-zinc-700 hover:border-zinc-500": !isSelected,
+    },
+  );
 
   const handleClick = (): void => {
     onSelect(role);
@@ -29,7 +35,7 @@ export const RoleCard = ({ role, isSelected, onSelect }: RoleCardProps): JSX.Ele
       role="radio"
       aria-checked={isSelected}
       aria-label={label}
-      className={`${colors} flex flex-col items-center gap-1 rounded-xl border-2 p-4 transition-colors`}
+      className={className}
       onClick={handleClick}
     >
       <span className="text-3xl">{icon}</span>
