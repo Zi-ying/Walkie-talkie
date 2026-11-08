@@ -40,6 +40,10 @@ export const WireMessageSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("roster"), peers: z.array(PeerInfoSchema) }), // dispatch → everyone
   z.object({ type: z.literal("shift-log"), events: z.array(ShiftEventSchema) }), // dispatch → newcomer
   z.object({ type: z.literal("shift-event"), event: ShiftEventSchema }), // dispatch → everyone
+  // Push-to-talk: dispatch decides who holds the floor (one speaker at a time, first come first served).
+  z.object({ type: z.literal("talk-request") }), // member → dispatch
+  z.object({ type: z.literal("talk-release") }), // member → dispatch
+  z.object({ type: z.literal("floor"), speakerId: z.string().nullable() }), // dispatch → everyone
 ]);
 export type WireMessage = z.infer<typeof WireMessageSchema>;
 
@@ -57,8 +61,12 @@ export type ChannelApi = {
   roster: PeerInfo[]; // everyone on the channel, including me
   shiftLog: ShiftEvent[]; // oldest first, written by dispatch
   hearingCount: number; // how many people's audio we are receiving
+  speaker: PeerInfo | null; // who holds the floor, null = channel free
+  isTalking: boolean; // I hold the floor and my mic is on
   join: (name: string, channel: string, role: Role) => Promise<void>;
   leave: () => Promise<void>;
+  startTalking: () => void; // press: asks for the floor, ignored if someone else holds it
+  stopTalking: () => void; // release
 };
 
 // Dispatch is the meeting point: a predictable id members can find with just the channel code.

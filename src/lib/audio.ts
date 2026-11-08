@@ -19,6 +19,14 @@ export const stopAudio = (audio: HTMLAudioElement): void => {
   audio.srcObject = null;
 };
 
+// Push-to-talk: the calls stay open, we only switch the mic track on and off.
+// Every call shares this stream, so this mutes or unmutes us for everyone at once.
+export const setMicrophoneEnabled = (stream: MediaStream, enabled: boolean): void => {
+  stream.getAudioTracks().forEach((track: MediaStreamTrack): void => {
+    track.enabled = enabled;
+  });
+};
+
 // Stopping the tracks turns off the browser's "mic in use" indicator.
 export const stopStream = (stream: MediaStream): void => {
   stream.getTracks().forEach((track: MediaStreamTrack): void => track.stop());

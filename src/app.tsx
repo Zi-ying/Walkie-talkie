@@ -1,5 +1,6 @@
 import { useState } from "react";
 
+import { PushToTalkButton } from "@/components/push-to-talk-button";
 import { RosterItem } from "@/components/roster-item";
 import { ShiftLogItem } from "@/components/shift-log-item";
 import { useChannel } from "@/hooks/use-channel";
@@ -11,7 +12,8 @@ import type { ChannelApi, PeerInfo, Role, ShiftEvent } from "@/lib/types";
 // Temporary test screen for the PeerJS steps. The real UI comes later.
 const App = (): JSX.Element => {
   const channelApi: ChannelApi = useChannel();
-  const { status, errorMessage, me, roster, shiftLog, hearingCount } = channelApi;
+  const { status, errorMessage, me, roster, shiftLog, hearingCount, speaker, isTalking } =
+    channelApi;
 
   const [name, setName] = useState<string>("");
   const [channel, setChannel] = useState<string>("factory1");
@@ -28,6 +30,10 @@ const App = (): JSX.Element => {
   const isReady: boolean = status === "ready" && myId !== "";
   const leaveLabel: string = isDispatch ? "Close channel" : "End shift";
   const hearingLabel: string = `🔊 Hearing ${hearingCount} ${hearingCount === 1 ? "person" : "people"}`;
+
+  const isBusy: boolean = speaker !== null && !isTalking;
+  const canTalk: boolean = status === "ready" && !isBusy;
+  const speakerLabel: string = speaker === null ? "Channel free" : `🔴 ${speaker.name} is talking`;
 
   const isMyself = (peer: PeerInfo): boolean => peer.id === myId;
 
@@ -109,6 +115,16 @@ const App = (): JSX.Element => {
       )}
       {isReady && <p className="text-green-400">Connected as {myId}</p>}
       {isConnected && <p>{hearingLabel}</p>}
+      {isReady && <p className="font-bold">{speakerLabel}</p>}
+      {isReady && (
+        <PushToTalkButton
+          isTalking={isTalking}
+          isBusy={isBusy}
+          isDisabled={!canTalk}
+          onStart={channelApi.startTalking}
+          onStop={channelApi.stopTalking}
+        />
+      )}
       {hasError && <p className="text-red-400">{errorMessage}</p>}
 
       <h2 className="text-lg font-bold mt-4">On the channel</h2>

@@ -3,6 +3,7 @@ import { useRef, useState } from "react";
 import {
   getMicrophone,
   playRemoteStream,
+  setMicrophoneEnabled,
   stopAudio,
   stopStream,
 } from "@/lib/audio";
@@ -64,6 +65,7 @@ export const useChannel = (): ChannelApi => {
   const [roster, setRoster] = useState<PeerInfo[]>([]);
   const [shiftLog, setShiftLog] = useState<ShiftEvent[]>([]);
   const [hearingCount, setHearingCount] = useState<number>(0);
+  const [speakerId, setSpeakerId] = useState<string | null>(null);
 
   // Refs: PeerJS handlers are created once (at join) and must always see the latest values.
   const peerRef: RefObject<Peer | null> = useRef<Peer | null>(null);
@@ -76,6 +78,8 @@ export const useChannel = (): ChannelApi => {
   >(new Map<string, HTMLAudioElement>()); // keyed by remote peer id
   const isLeavingRef: RefObject<boolean> = useRef<boolean>(false);
   const retryTimerRef: RefObject<number | null> = useRef<number | null>(null);
+  const speakerIdRef: RefObject<string | null> = useRef<string | null>(null);
+  const isHoldingRef: RefObject<boolean> = useRef<boolean>(false); // push-to-talk button held down
   // Dispatch only
   const membersRef: RefObject<Map<string, MemberEntry>> = useRef<
     Map<string, MemberEntry>
@@ -137,12 +141,34 @@ export const useChannel = (): ChannelApi => {
     }
   };
 
+  // ---------- Push-to-talk (both sides) ----------
+
+  // The floor changed. Only the speaker's mic is on, and only while they hold the button.
+  const applyFloor = (newSpeakerId: string | null): void => {
+    speakerIdRef.current = newSpeakerId;
+    setSpeakerId(newSpeakerId);
+    const iHaveFloor: boolean = meRef.current !== null && newSpeakerId === meRef.current.id;
+    if (microphoneRef.current !== null) {
+      setMicrophoneEnabled(microphoneRef.current, iHaveFloor && isHoldingRef.current);
+    }
+    // Released the button before the floor was granted: give it back right away.
+    if (iHaveFloor && !isHoldingRef.current) {
+      releaseFloor();
+    }
+  };
+
   // ---------- Dispatch side ----------
 
   const broadcast = (message: WireMessage): void => {
     membersRef.current.forEach((member: MemberEntry): void =>
       sendMessage(member.connection, message),
     );
+  };
+
+  // Broadcast first: applyFloor can release the floor again, and that newer "floor" must arrive last.
+  const grantFloor = (newSpeakerId: string | null): void => {
+    broadcast({ type: "floor", speakerId: newSpeakerId });
+    applyFloor(newSpeakerId);
   };
 
   const publishRoster = (): void => {
@@ -169,6 +195,7 @@ export const useChannel = (): ChannelApi => {
         sendMessage(connection, { type: "shift-log", events: shiftLogRef.current });
         recordShiftEvent(info, "on-shift");
         publishRoster();
+        sendMessage(connection, { type: "floor", speakerId: speakerIdRef.current });
         break;
       }
       case "bye": {
@@ -178,8 +205,19 @@ export const useChannel = (): ChannelApi => {
         }
         break;
       }
+      case "talk-request":
+        // First come, first served: ignored while someone else holds the floor.
+        if (speakerIdRef.current === null && membersRef.current.has(connection.peer)) {
+          grantFloor(connection.peer);
+        }
+        break;
+      case "talk-release":
+        if (speakerIdRef.current === connection.peer) {
+          grantFloor(null);
+        }
+        break;
       default:
-        // roster, shift-log and shift-event only go from dispatch to members.
+        // roster, shift-log, shift-event and floor only go from dispatch to members.
         break;
     }
   };
@@ -196,6 +234,10 @@ export const useChannel = (): ChannelApi => {
     }
     recordShiftEvent(member.info, member.saidBye ? "ended-shift" : "lost-connection");
     publishRoster();
+    // The speaker left mid-sentence: free the floor so the channel doesn't stay stuck.
+    if (speakerIdRef.current === remotePeerId) {
+      grantFloor(null);
+    }
   };
 
   const acceptMembers = (peer: Peer): void => {
@@ -212,6 +254,29 @@ export const useChannel = (): ChannelApi => {
   };
 
   // ---------- Member side ----------
+
+  const sendToDispatch = (message: WireMessage): void => {
+    const connection: DataConnection | null = dispatchConnectionRef.current;
+    if (connection !== null && connection.open) {
+      sendMessage(connection, message);
+    }
+  };
+
+  // Both sides: give the floor back. Dispatch frees it directly, members tell dispatch
+  // (and mute right away, without waiting for the new "floor" message).
+  const releaseFloor = (): void => {
+    if (meRef.current === null) {
+      return;
+    }
+    if (meRef.current.role === "dispatch") {
+      grantFloor(null);
+      return;
+    }
+    if (microphoneRef.current !== null) {
+      setMicrophoneEnabled(microphoneRef.current, false);
+    }
+    sendToDispatch({ type: "talk-release" });
+  };
 
   const stopRetrying = (): void => {
     if (retryTimerRef.current !== null) {
@@ -288,8 +353,11 @@ export const useChannel = (): ChannelApi => {
       case "bye":
         dispatchSaidByeRef.current = true;
         break;
+      case "floor":
+        applyFloor(message.speakerId);
+        break;
       default:
-        // hello only goes from members to dispatch.
+        // hello, talk-request and talk-release only go from members to dispatch.
         break;
     }
   };
@@ -333,6 +401,7 @@ export const useChannel = (): ChannelApi => {
       forgetDispatch(dispatchId);
       updateRoster([]);
       syncMemberCalls([]); // the channel is closed: hang up on the other members too
+      applyFloor(null); // and nobody is talking any more
       setStatus("waiting-dispatch");
       scheduleRetry(peer, channel);
     });
@@ -352,11 +421,15 @@ export const useChannel = (): ChannelApi => {
     setErrorMessage("");
     setStatus("connecting");
     isLeavingRef.current = false;
+    isHoldingRef.current = false;
+    speakerIdRef.current = null;
+    setSpeakerId(null);
     updateRoster([]);
     updateShiftLog([]);
     try {
       // Ask for the mic first: this runs inside the Join click, which browsers require.
       microphoneRef.current = await getMicrophone();
+      setMicrophoneEnabled(microphoneRef.current, false); // muted until push-to-talk
       const id: string = role === "dispatch" ? dispatchPeerId(channel) : memberPeerId(channel);
       const peer: Peer = await createPeer(id);
       peerRef.current = peer;
@@ -432,10 +505,58 @@ export const useChannel = (): ChannelApi => {
     dispatchCallRef.current = null;
     memberCallsRef.current.clear(); // destroy() already hung up every call
     stopAllAudio();
+    isHoldingRef.current = false;
+    speakerIdRef.current = null;
+    setSpeakerId(null);
     setMe(null);
     updateRoster([]);
     setStatus("idle");
   };
 
-  return { status, errorMessage, me, roster, shiftLog, hearingCount, join, leave };
+  // Press: dispatch decides directly, members ask dispatch. Busy channel: wait and press again.
+  const startTalking = (): void => {
+    const self: PeerInfo | null = meRef.current;
+    if (self === null) {
+      return;
+    }
+    isHoldingRef.current = true;
+    if (speakerIdRef.current !== null) {
+      return;
+    }
+    if (self.role === "dispatch") {
+      grantFloor(self.id);
+    } else {
+      sendToDispatch({ type: "talk-request" });
+    }
+  };
+
+  // Release: if we hold the floor, give it back. If the grant is still on its way,
+  // applyFloor() will see we let go and give it back as soon as it arrives.
+  const stopTalking = (): void => {
+    isHoldingRef.current = false;
+    if (meRef.current !== null && speakerIdRef.current === meRef.current.id) {
+      releaseFloor();
+    }
+  };
+
+  const speakerInRoster: PeerInfo | undefined = roster.find(
+    (rosterPeer: PeerInfo): boolean => rosterPeer.id === speakerId,
+  );
+  const speaker: PeerInfo | null = speakerInRoster === undefined ? null : speakerInRoster;
+  const isTalking: boolean = me !== null && speakerId === me.id;
+
+  return {
+    status,
+    errorMessage,
+    me,
+    roster,
+    shiftLog,
+    hearingCount,
+    speaker,
+    isTalking,
+    join,
+    leave,
+    startTalking,
+    stopTalking,
+  };
 };
