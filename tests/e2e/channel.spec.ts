@@ -31,6 +31,28 @@ test("dispatch and member hear each other and share the roster and shift log", a
   await expect(memberLog.getByText("is on shift")).toHaveCount(2);
 });
 
+test("with three people, everyone hears everyone, and a member who leaves is hung up on by all", async ({
+  context,
+}: { context: BrowserContext }): Promise<void> => {
+  const channel: string = uniqueChannel();
+  const dispatch: Page = await context.newPage();
+  const firstMember: Page = await context.newPage();
+  const secondMember: Page = await context.newPage();
+
+  await joinChannel(dispatch, { name: "Ana", channel, role: "dispatch" });
+  await joinChannel(firstMember, { name: "Bob", channel, role: "member" });
+  await joinChannel(secondMember, { name: "Cleo", channel, role: "member" });
+
+  await expect(dispatch.getByText("Hearing 2 people")).toBeVisible();
+  await expect(firstMember.getByText("Hearing 2 people")).toBeVisible();
+  await expect(secondMember.getByText("Hearing 2 people")).toBeVisible();
+
+  await leaveChannel(secondMember);
+
+  await expect(dispatch.getByText("Hearing 1 person")).toBeVisible();
+  await expect(firstMember.getByText("Hearing 1 person")).toBeVisible();
+});
+
 test("a member who joins first waits, then connects when dispatch arrives", async ({
   context,
 }: { context: BrowserContext }): Promise<void> => {

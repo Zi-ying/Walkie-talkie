@@ -84,6 +84,9 @@ export const useChannel = (): ChannelApi => {
   const dispatchConnectionRef: RefObject<DataConnection | null> = useRef<DataConnection | null>(null);
   const dispatchCallRef: RefObject<MediaConnection | null> = useRef<MediaConnection | null>(null);
   const dispatchSaidByeRef: RefObject<boolean> = useRef<boolean>(false);
+  const memberCallsRef: RefObject<Map<string, MediaConnection>> = useRef<
+    Map<string, MediaConnection>
+  >(new Map<string, MediaConnection>()); // calls we started to other members, keyed by peer id
 
   // ---------- State that handlers also read ----------
 
@@ -232,10 +235,49 @@ export const useChannel = (): ChannelApi => {
     stopAudioFrom(dispatchId);
   };
 
+  // Voice mesh: members also call each other, so everyone hears everyone (fine for small groups).
+  // Both sides get the same roster, and only the smaller id calls, so each pair has exactly one call.
+  const syncMemberCalls = (peers: PeerInfo[]): void => {
+    const peer: Peer | null = peerRef.current;
+    const self: PeerInfo | null = meRef.current;
+    const microphone: MediaStream | null = microphoneRef.current;
+    if (peer === null || self === null || microphone === null) {
+      return;
+    }
+    const peerIds: string[] = peers.map((rosterPeer: PeerInfo): string => rosterPeer.id);
+
+    // Hang up on, and stop hearing, anyone who left the roster.
+    memberCallsRef.current.forEach((call: MediaConnection, remoteId: string): void => {
+      if (!peerIds.includes(remoteId)) {
+        call.close();
+        memberCallsRef.current.delete(remoteId);
+      }
+    });
+    [...remoteAudiosRef.current.keys()].forEach((remoteId: string): void => {
+      if (!peerIds.includes(remoteId)) {
+        stopAudioFrom(remoteId);
+      }
+    });
+
+    peers.forEach((rosterPeer: PeerInfo): void => {
+      const shouldCall: boolean =
+        rosterPeer.role === "member" &&
+        self.id < rosterPeer.id &&
+        !memberCallsRef.current.has(rosterPeer.id);
+      if (shouldCall) {
+        memberCallsRef.current.set(
+          rosterPeer.id,
+          callPeer(peer, rosterPeer.id, microphone, playAudioFrom),
+        );
+      }
+    });
+  };
+
   const handleDispatchMessage = (message: WireMessage): void => {
     switch (message.type) {
       case "roster":
         updateRoster(message.peers);
+        syncMemberCalls(message.peers);
         break;
       case "shift-log":
         updateShiftLog(message.events);
@@ -290,6 +332,7 @@ export const useChannel = (): ChannelApi => {
       }
       forgetDispatch(dispatchId);
       updateRoster([]);
+      syncMemberCalls([]); // the channel is closed: hang up on the other members too
       setStatus("waiting-dispatch");
       scheduleRetry(peer, channel);
     });
@@ -387,6 +430,7 @@ export const useChannel = (): ChannelApi => {
     membersRef.current.clear();
     dispatchConnectionRef.current = null;
     dispatchCallRef.current = null;
+    memberCallsRef.current.clear(); // destroy() already hung up every call
     stopAllAudio();
     setMe(null);
     updateRoster([]);
