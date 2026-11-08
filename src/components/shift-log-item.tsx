@@ -17,11 +17,14 @@ const shiftEventText = (event: ShiftEvent): string => {
   }
 };
 
-export const ShiftLogItem = ({ event }: ShiftLogItemProps): JSX.Element => (
-  <li>
-    <span className="text-zinc-500">
-      {new Date(event.at).toLocaleTimeString()}
-    </span>{" "}
-    {shiftEventText(event)}
-  </li>
-);
+export const ShiftLogItem = ({ event }: ShiftLogItemProps): JSX.Element => {
+  const time: string = new Date(event.at).toLocaleTimeString();
+  const text: string = shiftEventText(event);
+
+  return (
+    <li className="flex gap-2">
+      <span className="text-zinc-500">{time}</span>
+      <span>{text}</span>
+    </li>
+  );
+};

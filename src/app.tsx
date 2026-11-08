@@ -17,8 +17,19 @@ const App = (): JSX.Element => {
   const [channel, setChannel] = useState<string>("factory1");
   const [role, setRole] = useState<Role>("member");
 
+  const isDispatch: boolean = role === "dispatch";
   const isConnected: boolean = status !== "idle";
+  const isConnecting: boolean = status === "connecting";
+  const isWaitingForDispatch: boolean = status === "waiting-dispatch";
   const canJoin: boolean = name !== "" && !isConnected;
+  const hasError: boolean = errorMessage !== "";
+
+  const myId: string = me === null ? "" : me.id;
+  const isReady: boolean = status === "ready" && myId !== "";
+  const leaveLabel: string = isDispatch ? "Close channel" : "End shift";
+  const hearingLabel: string = `🔊 Hearing ${hearingCount} ${hearingCount === 1 ? "person" : "people"}`;
+
+  const isMyself = (peer: PeerInfo): boolean => peer.id === myId;
 
   const join = async (): Promise<void> => {
     await channelApi.join(name, channel, role);
@@ -26,13 +37,20 @@ const App = (): JSX.Element => {
 
   // Leaving is deliberate: members end their shift, dispatch closes the channel for everyone.
   const leave = async (): Promise<void> => {
-    const question: string =
-      role === "dispatch"
-        ? "Close the channel? Everyone will be disconnected."
-        : "End your shift? Dispatch will see you as off duty.";
+    const question: string = isDispatch
+      ? "Close the channel? Everyone will be disconnected."
+      : "End your shift? Dispatch will see you as off duty.";
     if (window.confirm(question)) {
       await channelApi.leave();
     }
+  };
+
+  const handleNameChange = (event: ChangeEvent<HTMLInputElement>): void => {
+    setName(event.target.value);
+  };
+
+  const handleChannelChange = (event: ChangeEvent<HTMLInputElement>): void => {
+    setChannel(event.target.value);
   };
 
   const handleRoleChange = (event: ChangeEvent<HTMLSelectElement>): void => {
@@ -51,9 +69,7 @@ const App = (): JSX.Element => {
         aria-label="Name"
         value={name}
         disabled={isConnected}
-        onChange={(event: ChangeEvent<HTMLInputElement>): void =>
-          setName(event.target.value)
-        }
+        onChange={handleNameChange}
       />
       <input
         className="bg-zinc-800 p-2 rounded"
@@ -61,9 +77,7 @@ const App = (): JSX.Element => {
         aria-label="Channel"
         value={channel}
         disabled={isConnected}
-        onChange={(event: ChangeEvent<HTMLInputElement>): void =>
-          setChannel(event.target.value)
-        }
+        onChange={handleChannelChange}
       />
       <select
         className="bg-zinc-800 p-2 rounded"
@@ -77,7 +91,7 @@ const App = (): JSX.Element => {
       </select>
       {isConnected ? (
         <button className="bg-zinc-700 p-2 rounded font-bold" onClick={leave}>
-          {role === "dispatch" ? "Close channel" : "End shift"}
+          {leaveLabel}
         </button>
       ) : (
         <button
@@ -89,29 +103,19 @@ const App = (): JSX.Element => {
         </button>
       )}
 
-      {status === "connecting" && <p className="text-zinc-400">Connecting…</p>}
-      {status === "waiting-dispatch" && (
+      {isConnecting && <p className="text-zinc-400">Connecting…</p>}
+      {isWaitingForDispatch && (
         <p className="text-amber-400">⏳ Waiting for dispatch…</p>
       )}
-      {status === "ready" && me !== null && (
-        <p className="text-green-400">Connected as {me.id}</p>
-      )}
-      {isConnected && (
-        <p>
-          🔊 Hearing {hearingCount} {hearingCount === 1 ? "person" : "people"}
-        </p>
-      )}
-      {errorMessage !== "" && <p className="text-red-400">{errorMessage}</p>}
+      {isReady && <p className="text-green-400">Connected as {myId}</p>}
+      {isConnected && <p>{hearingLabel}</p>}
+      {hasError && <p className="text-red-400">{errorMessage}</p>}
 
       <h2 className="text-lg font-bold mt-4">On the channel</h2>
       <ul className="flex flex-col gap-1 text-sm" aria-label="On the channel">
         {roster.map(
           (peer: PeerInfo): JSX.Element => (
-            <RosterItem
-              key={peer.id}
-              peer={peer}
-              isMe={me !== null && peer.id === me.id}
-            />
+            <RosterItem key={peer.id} peer={peer} isMe={isMyself(peer)} />
           ),
         )}
       </ul>

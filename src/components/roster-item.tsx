@@ -6,9 +6,14 @@ interface RosterItemProps {
   isMe: boolean;
 }
 
-export const RosterItem = ({ peer, isMe }: RosterItemProps): JSX.Element => (
-  <li>
-    {peer.role === "dispatch" ? "🎧" : "👷"} {peer.name}
-    {isMe && <span className="text-zinc-500"> (you)</span>}
-  </li>
-);
+export const RosterItem = ({ peer, isMe }: RosterItemProps): JSX.Element => {
+  const icon: string = peer.role === "dispatch" ? "🎧" : "👷";
+
+  return (
+    <li className="flex gap-1">
+      <span>{icon}</span>
+      <span>{peer.name}</span>
+      {isMe && <span className="text-zinc-500">(you)</span>}
+    </li>
+  );
+};
