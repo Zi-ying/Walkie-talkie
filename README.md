@@ -12,6 +12,15 @@ yarn dev
 
 Open two Chrome tabs: one as Dispatch, one as Member, on the same channel code.
 
+## Tests
+
+```bash
+yarn playwright install chromium   # once
+yarn test:e2e
+```
+
+End-to-end tests (Playwright) open real Chrome pages with a fake microphone and check the core flows: dispatch and member hear each other, a member waiting for dispatch, a duplicate dispatch being refused, "ended shift" vs "lost connection" in the shift log, and members coming back when dispatch reopens the channel. They go through the public PeerJS cloud server, so they need internet access, and each test uses its own random channel.
+
 ## Architecture
 
 _To be written._
