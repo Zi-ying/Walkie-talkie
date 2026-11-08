@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-import { joinChannel, uniqueChannel } from "./channel-helpers.ts";
+import { expectHearing, joinChannel, uniqueChannel } from "./channel-helpers.ts";
 
 import type { BrowserContext, Locator, Page, Route } from "@playwright/test";
 
@@ -97,7 +97,7 @@ const joinTeam = async (context: BrowserContext): Promise<Team> => {
   await joinChannel(dispatch, { name: "Ana", channel, role: "dispatch" });
   await joinChannel(bob, { name: "Bob", channel, role: "member" });
   await joinChannel(cleo, { name: "Cleo", channel, role: "member" });
-  await expect(cleo.getByText("Hearing 2 people")).toBeVisible();
+  await expectHearing(cleo, 2);
   return { dispatch, bob, cleo };
 };
 
@@ -119,10 +119,12 @@ test("a transmission is transcribed, and Claude's simple note reaches everyone",
 
   await sayOneMessage(bob);
 
+  // Everyone sees the AI note; only dispatch sees the original words.
   for (const page of [dispatch, bob, cleo]) {
-    await expect(page.getByRole("list", { name: "Messages" })).toContainText(TRANSCRIPT);
     await expect(page.getByRole("region", { name: "Latest note" })).toContainText(NOTE);
   }
+  await expect(dispatch.getByRole("list", { name: "Messages" })).toContainText(TRANSCRIPT);
+  await expect(cleo.getByText(TRANSCRIPT)).toHaveCount(0);
 
   // Only dispatch calls Claude, once, with the cheap model and the transcript.
   expect(requestBodies).toHaveLength(1);
@@ -130,7 +132,7 @@ test("a transmission is transcribed, and Claude's simple note reaches everyone",
   expect(requestBodies[0]).toContain(TRANSCRIPT);
 });
 
-test("if Claude fails, everyone still gets the transcript", async ({
+test("if Claude fails, dispatch still gets the transcript and members see no note", async ({
   context,
 }: { context: BrowserContext }): Promise<void> => {
   const requestBodies: string[] = [];
@@ -140,12 +142,12 @@ test("if Claude fails, everyone still gets the transcript", async ({
 
   await sayOneMessage(bob);
 
+  const messages: Locator = dispatch.getByRole("list", { name: "Messages" });
+  await expect(messages).toContainText(TRANSCRIPT);
+  await expect(messages).toContainText("AI note unavailable");
   for (const page of [dispatch, cleo]) {
-    const messages: Locator = page.getByRole("list", { name: "Messages" });
-    await expect(messages).toContainText(TRANSCRIPT);
-    await expect(messages).toContainText("AI note unavailable");
+    await expect(page.getByRole("region", { name: "Latest note" })).toHaveCount(0);
   }
-  await expect(dispatch.getByRole("region", { name: "Latest note" })).toHaveCount(0);
 });
 
 test("someone who joins later receives the earlier messages", async ({
@@ -159,7 +161,7 @@ test("someone who joins later receives the earlier messages", async ({
   const bob: Page = await context.newPage();
   await joinChannel(dispatch, { name: "Ana", channel, role: "dispatch" });
   await joinChannel(bob, { name: "Bob", channel, role: "member" });
-  await expect(bob.getByText("Hearing 1 person")).toBeVisible();
+  await expectHearing(bob, 1);
 
   await sayOneMessage(bob);
   await expect(dispatch.getByRole("region", { name: "Latest note" })).toContainText(NOTE);
@@ -167,6 +169,5 @@ test("someone who joins later receives the earlier messages", async ({
   const lateComer: Page = await context.newPage();
   await joinChannel(lateComer, { name: "Dee", channel, role: "member" });
 
-  await expect(lateComer.getByRole("list", { name: "Messages" })).toContainText(TRANSCRIPT);
   await expect(lateComer.getByRole("region", { name: "Latest note" })).toContainText(NOTE);
 });

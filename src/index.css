@@ -1,1 +1,16 @@
 @import "tailwindcss";
+
+@theme {
+  /* A new AI note flashes three times so it gets noticed, then stays still. */
+  --animate-note-flash: note-flash 1s ease-in-out 3;
+
+  @keyframes note-flash {
+    0%,
+    100% {
+      box-shadow: 0 0 0 0 rgb(252 211 77 / 0);
+    }
+    50% {
+      box-shadow: 0 0 0 8px rgb(252 211 77 / 0.45);
+    }
+  }
+}

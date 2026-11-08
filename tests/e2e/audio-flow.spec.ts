@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-import { joinChannel, uniqueChannel } from "./channel-helpers.ts";
+import { expectHearing, joinChannel, uniqueChannel } from "./channel-helpers.ts";
 
 import type { BrowserContext, Page } from "@playwright/test";
 
@@ -65,7 +65,7 @@ test("audio reaches the others only while the button is held", async ({
   await joinChannel(dispatch, { name: "Ana", channel, role: "dispatch" });
   await joinChannel(bob, { name: "Bob", channel, role: "member" });
   await joinChannel(cleo, { name: "Cleo", channel, role: "member" });
-  await expect(cleo.getByText("Hearing 2 people")).toBeVisible();
+  await expectHearing(cleo, 2);
 
   const silenceBefore: number = await energyReceivedDuring(cleo, 2000);
 

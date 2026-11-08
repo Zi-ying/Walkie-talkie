@@ -1,3 +1,5 @@
+import { expect } from "@playwright/test";
+
 import { generateId } from "@/lib/ids.ts";
 
 import type { Dialog, Page } from "@playwright/test";
@@ -22,6 +24,12 @@ export const joinChannel = async (
   await page.getByLabel("Channel", { exact: true }).fill(channel);
   await page.getByRole("radio", { name: roleLabel, exact: true }).click();
   await page.getByRole("button", { name: "Join channel" }).click();
+};
+
+// The page receives audio from `count` people (read from the connection status label).
+export const expectHearing = async (page: Page, count: number): Promise<void> => {
+  const label: string = `Hearing ${count} ${count === 1 ? "person" : "people"}`;
+  await expect(page.getByLabel(label, { exact: true })).toBeVisible();
 };
 
 // Accepts the "End your shift?" / "Close the channel?" confirmation.

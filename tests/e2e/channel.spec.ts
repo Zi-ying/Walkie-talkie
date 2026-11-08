@@ -1,12 +1,12 @@
 import { expect, test } from "@playwright/test";
 
-import { joinChannel, leaveChannel, uniqueChannel } from "./channel-helpers.ts";
+import { expectHearing, joinChannel, leaveChannel, uniqueChannel } from "./channel-helpers.ts";
 
-import type { BrowserContext, Page } from "@playwright/test";
+import type { BrowserContext, Locator, Page } from "@playwright/test";
 
 // Each page is a different person on the channel (like separate tabs).
 
-test("dispatch and member hear each other and share the roster and shift log", async ({
+test("dispatch and member hear each other; members see who's online, dispatch sees the shift log", async ({
   context,
 }: { context: BrowserContext }): Promise<void> => {
   const channel: string = uniqueChannel();
@@ -18,17 +18,19 @@ test("dispatch and member hear each other and share the roster and shift log", a
 
   await joinChannel(member, { name: "Bob", channel, role: "member" });
 
-  await expect(dispatch.getByText("Hearing 1 person")).toBeVisible();
-  await expect(member.getByText("Hearing 1 person")).toBeVisible();
+  await expectHearing(dispatch, 1);
+  await expectHearing(member, 1);
 
-  const memberRoster = member.getByRole("list", { name: "On the channel" });
-  await expect(memberRoster).toContainText("Ana");
-  await expect(memberRoster).toContainText("Bob");
+  // Members: who's online, as avatars in the top bar (no roster list, no shift log).
+  const memberOnline: Locator = member.getByRole("list", { name: "Online" });
+  await expect(memberOnline.getByLabel("Ana (Dispatch)")).toBeVisible();
+  await expect(memberOnline.getByLabel("Bob")).toBeVisible();
+  await expect(member.getByRole("list", { name: "Shift log" })).toHaveCount(0);
 
-  const memberLog = member.getByRole("list", { name: "Shift log" });
-  await expect(memberLog).toContainText("Ana");
-  await expect(memberLog).toContainText("Bob");
-  await expect(memberLog.getByText("is on shift")).toHaveCount(2);
+  const dispatchLog: Locator = dispatch.getByRole("list", { name: "Shift log" });
+  await expect(dispatchLog).toContainText("Ana");
+  await expect(dispatchLog).toContainText("Bob");
+  await expect(dispatchLog.getByText("is on shift")).toHaveCount(2);
 });
 
 test("with three people, everyone hears everyone, and a member who leaves is hung up on by all", async ({
@@ -43,14 +45,14 @@ test("with three people, everyone hears everyone, and a member who leaves is hun
   await joinChannel(firstMember, { name: "Bob", channel, role: "member" });
   await joinChannel(secondMember, { name: "Cleo", channel, role: "member" });
 
-  await expect(dispatch.getByText("Hearing 2 people")).toBeVisible();
-  await expect(firstMember.getByText("Hearing 2 people")).toBeVisible();
-  await expect(secondMember.getByText("Hearing 2 people")).toBeVisible();
+  await expectHearing(dispatch, 2);
+  await expectHearing(firstMember, 2);
+  await expectHearing(secondMember, 2);
 
   await leaveChannel(secondMember);
 
-  await expect(dispatch.getByText("Hearing 1 person")).toBeVisible();
-  await expect(firstMember.getByText("Hearing 1 person")).toBeVisible();
+  await expectHearing(dispatch, 1);
+  await expectHearing(firstMember, 1);
 });
 
 test("a member who joins first waits, then connects when dispatch arrives", async ({
@@ -65,8 +67,8 @@ test("a member who joins first waits, then connects when dispatch arrives", asyn
 
   await joinChannel(dispatch, { name: "Ana", channel, role: "dispatch" });
 
-  await expect(member.getByText("Hearing 1 person")).toBeVisible();
-  await expect(dispatch.getByText("Hearing 1 person")).toBeVisible();
+  await expectHearing(member, 1);
+  await expectHearing(dispatch, 1);
 });
 
 test("a second dispatch on the same channel is refused", async ({
@@ -92,14 +94,14 @@ test("a member ending their shift is logged as ended shift for dispatch", async 
 
   await joinChannel(dispatch, { name: "Ana", channel, role: "dispatch" });
   await joinChannel(member, { name: "Bob", channel, role: "member" });
-  await expect(dispatch.getByText("Hearing 1 person")).toBeVisible();
+  await expectHearing(dispatch, 1);
 
   await leaveChannel(member);
 
   const dispatchLog = dispatch.getByRole("list", { name: "Shift log" });
   await expect(dispatchLog).toContainText("ended shift");
   await expect(dispatchLog).not.toContainText("lost connection");
-  await expect(dispatch.getByText("Hearing 0 people")).toBeVisible();
+  await expectHearing(dispatch, 0);
   await expect(dispatch.getByRole("list", { name: "On the channel" })).not.toContainText("Bob");
 });
 
@@ -112,7 +114,7 @@ test("closing the tab is logged as lost connection for dispatch", async ({
 
   await joinChannel(dispatch, { name: "Ana", channel, role: "dispatch" });
   await joinChannel(member, { name: "Bob", channel, role: "member" });
-  await expect(dispatch.getByText("Hearing 1 person")).toBeVisible();
+  await expectHearing(dispatch, 1);
 
   await member.close();
 
@@ -120,7 +122,7 @@ test("closing the tab is logged as lost connection for dispatch", async ({
     "lost connection",
     { timeout: 45000 },
   );
-  await expect(dispatch.getByText("Hearing 0 people")).toBeVisible();
+  await expectHearing(dispatch, 0);
 });
 
 test("when dispatch closes and reopens the channel, members come back", async ({
@@ -132,15 +134,14 @@ test("when dispatch closes and reopens the channel, members come back", async ({
 
   await joinChannel(dispatch, { name: "Ana", channel, role: "dispatch" });
   await joinChannel(member, { name: "Bob", channel, role: "member" });
-  await expect(member.getByText("Hearing 1 person")).toBeVisible();
+  await expectHearing(member, 1);
 
   await leaveChannel(dispatch);
 
   await expect(member.getByText("Waiting for dispatch")).toBeVisible();
-  await expect(member.getByRole("list", { name: "Shift log" })).toContainText("ended shift");
 
   await joinChannel(dispatch, { name: "Ana", channel, role: "dispatch" });
 
-  await expect(dispatch.getByText("Hearing 1 person")).toBeVisible();
-  await expect(member.getByText("Hearing 1 person")).toBeVisible();
+  await expectHearing(dispatch, 1);
+  await expectHearing(member, 1);
 });

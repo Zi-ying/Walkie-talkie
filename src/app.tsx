@@ -1,5 +1,8 @@
+import { useState } from "react";
+
 import { ChannelScreen } from "@/components/channel-screen";
 import { JoinScreen } from "@/components/join-screen";
+import { MemberView } from "@/components/member-view";
 import { useChannel } from "@/hooks/use-channel";
 import { useTranscription } from "@/hooks/use-transcription";
 import { isLlmAvailable, writeSimpleNote } from "@/lib/llm";
@@ -15,11 +18,17 @@ const App = (): JSX.Element => {
   });
   useTranscription(channelApi.isTalking, channelApi.submitTranscript);
 
-  const isOnChannel: boolean = channelApi.status !== "idle";
-  const isDispatch: boolean = channelApi.me !== null && channelApi.me.role === "dispatch";
+  // What we joined with (the channel API only knows our role once connected).
+  const [channelName, setChannelName] = useState<string>("");
+  const [role, setRole] = useState<Role>("member");
 
-  const join = (name: string, channel: string, role: Role): void => {
-    void channelApi.join(name, channel, role);
+  const isOnChannel: boolean = channelApi.status !== "idle";
+  const isDispatch: boolean = role === "dispatch";
+
+  const join = (name: string, channel: string, joinedRole: Role): void => {
+    setChannelName(channel);
+    setRole(joinedRole);
+    void channelApi.join(name, channel, joinedRole);
   };
 
   // Leaving is deliberate: members end their shift, dispatch closes the channel for everyone.
@@ -35,7 +44,10 @@ const App = (): JSX.Element => {
   if (!isOnChannel) {
     return <JoinScreen errorMessage={channelApi.errorMessage} onJoin={join} />;
   }
-  return <ChannelScreen channelApi={channelApi} onLeave={leave} />;
+  if (isDispatch) {
+    return <ChannelScreen channelApi={channelApi} onLeave={leave} />;
+  }
+  return <MemberView channelApi={channelApi} channelName={channelName} onLeave={leave} />;
 };
 
 export default App;

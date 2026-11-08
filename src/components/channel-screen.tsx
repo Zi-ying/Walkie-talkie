@@ -27,7 +27,8 @@ export const ChannelScreen = ({ channelApi, onLeave }: ChannelScreenProps): JSX.
   const myId: string = me === null ? "" : me.id;
   const isReady: boolean = status === "ready" && myId !== "";
   const leaveLabel: string = isDispatch ? "Close channel" : "End shift";
-  const hearingLabel: string = `🔊 Hearing ${hearingCount} ${hearingCount === 1 ? "person" : "people"}`;
+  const hearingAriaLabel: string = `Hearing ${hearingCount} ${hearingCount === 1 ? "person" : "people"}`;
+  const hearingLabel: string = `🔊 ${hearingAriaLabel}`;
 
   const isBusy: boolean = speaker !== null && !isTalking;
   const canTalk: boolean = status === "ready" && !isBusy;
@@ -58,7 +59,7 @@ export const ChannelScreen = ({ channelApi, onLeave }: ChannelScreenProps): JSX.
         <p className="text-amber-400">⏳ Waiting for dispatch…</p>
       )}
       {isReady && <p className="text-green-400">Connected as {myId}</p>}
-      <p>{hearingLabel}</p>
+      <p aria-label={hearingAriaLabel}>{hearingLabel}</p>
       {isReady && <p className="font-bold">{speakerLabel}</p>}
       {isReady && (
         <PushToTalkButton
