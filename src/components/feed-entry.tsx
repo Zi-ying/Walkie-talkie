@@ -25,9 +25,15 @@ export const FeedEntry = ({ item }: FeedEntryProps): JSX.Element => {
   const note: string = noteText(item);
   const isNoteReady: boolean = item.noteStatus === "ready";
   const transcript: string = `“${item.transcript}”`;
+  const isUrgent: boolean = isNoteReady && item.priority === "urgent";
+  const priorityLabel: string = isUrgent ? "🔴 Urgent" : "🟡 Info";
   const noteClassName: string = cn({
     "text-base font-bold text-amber-300": isNoteReady,
+    "text-red-400": isUrgent,
     "text-xs text-zinc-500": !isNoteReady,
+  });
+  const entryClassName: string = cn("flex flex-col gap-1 rounded-xl bg-zinc-900 p-3", {
+    "ring-1 ring-red-500": isUrgent,
   });
   const originalWords: JSX.Element = isNoteReady ? (
     <details className="text-sm">
@@ -39,9 +45,10 @@ export const FeedEntry = ({ item }: FeedEntryProps): JSX.Element => {
   );
 
   return (
-    <li className="flex flex-col gap-1 rounded-xl bg-zinc-900 p-3">
-      <div className="flex justify-between text-xs text-zinc-500">
+    <li className={entryClassName}>
+      <div className="flex justify-between gap-2 text-xs text-zinc-500">
         <span className="font-bold text-zinc-300">{item.speaker.name}</span>
+        {isNoteReady && <span className="ml-auto">{priorityLabel}</span>}
         <span>{time}</span>
       </div>
       <p className={noteClassName}>{note}</p>

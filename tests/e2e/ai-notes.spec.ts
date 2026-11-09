@@ -3,10 +3,12 @@ import { expect, test } from "@playwright/test";
 import { expectHearing, joinChannel, uniqueChannel } from "./channel-helpers.ts";
 
 import type { BrowserContext, Locator, Page, Route } from "@playwright/test";
+import type { SimpleNote } from "@/lib/types.ts";
 
 const TRANSCRIPT: string =
-  "hey uh so the conveyor on line three is jammed again can someone from maintenance come";
-const NOTE: string = "Line 3 conveyor jammed. Maintenance needed.";
+  "hey uh so mrs jones in room twelve is asking for her pain medication again can a nurse come";
+const NOTE: string = "Mrs Jones, room 12, asks for pain medication. Nurse needed.";
+const INFO_NOTE: SimpleNote = { note: NOTE, priority: "info" };
 
 // Headless Chrome can't recognise speech: replace the Web Speech API with a fake that
 // "hears" TRANSCRIPT and reports it when listening stops.
@@ -42,10 +44,10 @@ const CORS_HEADERS: Record<string, string> = {
 };
 
 // Intercepts every call to the Claude API: nothing leaves the machine. Records the request bodies.
-// `note` null = answer like an invalid API key.
+// The reply is the JSON a structured-output answer contains. `answer` null = like an invalid API key.
 const fakeClaude = async (
   context: BrowserContext,
-  note: string | null,
+  answer: SimpleNote | null,
   requestBodies: string[],
 ): Promise<void> => {
   await context.route("https://api.anthropic.com/**", async (route: Route): Promise<void> => {
@@ -55,7 +57,7 @@ const fakeClaude = async (
     }
     const body: string | null = route.request().postData();
     requestBodies.push(body === null ? "" : body);
-    if (note === null) {
+    if (answer === null) {
       await route.fulfill({
         status: 401,
         headers: CORS_HEADERS,
@@ -74,7 +76,7 @@ const fakeClaude = async (
         type: "message",
         role: "assistant",
         model: "claude-haiku-5-5",
-        content: [{ type: "text", text: note }],
+        content: [{ type: "text", text: JSON.stringify(answer) }],
         stop_reason: "end_turn",
         stop_sequence: null,
         usage: { input_tokens: 120, output_tokens: 12 },
@@ -114,7 +116,7 @@ test("a transmission is transcribed, and Claude's simple note reaches everyone",
 }: { context: BrowserContext }): Promise<void> => {
   const requestBodies: string[] = [];
   await installFakeSpeechRecognition(context);
-  await fakeClaude(context, NOTE, requestBodies);
+  await fakeClaude(context, INFO_NOTE, requestBodies);
   const { dispatch, bob, cleo }: Team = await joinTeam(context);
 
   await sayOneMessage(bob);
@@ -130,6 +132,22 @@ test("a transmission is transcribed, and Claude's simple note reaches everyone",
   expect(requestBodies).toHaveLength(1);
   expect(requestBodies[0]).toContain("claude-haiku-5-5");
   expect(requestBodies[0]).toContain(TRANSCRIPT);
+});
+
+test("a note Claude marks urgent is shown as urgent to everyone", async ({
+  context,
+}: { context: BrowserContext }): Promise<void> => {
+  const requestBodies: string[] = [];
+  await installFakeSpeechRecognition(context);
+  await fakeClaude(context, { note: NOTE, priority: "urgent" }, requestBodies);
+  const { dispatch, bob, cleo }: Team = await joinTeam(context);
+
+  await sayOneMessage(bob);
+
+  for (const page of [dispatch, bob, cleo]) {
+    await expect(page.getByRole("region", { name: "Latest note" })).toContainText("URGENT");
+  }
+  await expect(dispatch.getByRole("list", { name: "Messages" })).toContainText("🔴 Urgent");
 });
 
 test("if Claude fails, dispatch still gets the transcript and members see no note", async ({
@@ -155,7 +173,7 @@ test("someone who joins later receives the earlier messages", async ({
 }: { context: BrowserContext }): Promise<void> => {
   const requestBodies: string[] = [];
   await installFakeSpeechRecognition(context);
-  await fakeClaude(context, NOTE, requestBodies);
+  await fakeClaude(context, INFO_NOTE, requestBodies);
   const channel: string = uniqueChannel();
   const dispatch: Page = await context.newPage();
   const bob: Page = await context.newPage();

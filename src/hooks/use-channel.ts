@@ -37,6 +37,7 @@ import type {
   Role,
   ShiftEvent,
   ShiftEventKind,
+  SimpleNote,
   WireMessage,
 } from "@/lib/types";
 
@@ -57,9 +58,9 @@ const newShiftEvent = (peer: PeerInfo, kind: ShiftEventKind): ShiftEvent => ({
   at: Date.now(),
 });
 
-// Writes a short note for a transcript, or null when it can't. Injected by the app, so the radio
-// knows nothing about the AI behind it (and works the same without one).
-export type NoteWriter = (transcript: string) => Promise<string | null>;
+// Writes a short note (with its priority) for a transcript, or null when it can't. Injected by the
+// app, so the radio knows nothing about the AI behind it (and works the same without one).
+export type NoteWriter = (transcript: string) => Promise<SimpleNote | null>;
 
 export type ChannelOptions = {
   writeNote?: NoteWriter; // used by dispatch only; without it, notes are "unavailable"
@@ -244,20 +245,21 @@ export const useChannel = (options: ChannelOptions = {}): ChannelApi => {
       transcript,
       note: "",
       noteStatus: writeNote === undefined ? "unavailable" : "pending",
+      priority: "info",
       at: Date.now(),
     };
     shareFeedItem(item);
     if (writeNote === undefined) {
       return;
     }
-    const note: string | null = await writeNote(transcript);
+    const simpleNote: SimpleNote | null = await writeNote(transcript);
     if (isLeavingRef.current) {
       return;
     }
     shareFeedItem(
-      note === null
+      simpleNote === null
         ? { ...item, noteStatus: "unavailable" }
-        : { ...item, note, noteStatus: "ready" },
+        : { ...item, note: simpleNote.note, priority: simpleNote.priority, noteStatus: "ready" },
     );
   };
 

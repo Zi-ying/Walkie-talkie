@@ -11,7 +11,7 @@ export const isRole = (value: string): value is Role =>
   RoleSchema.safeParse(value).success;
 
 export const PeerInfoSchema = z.object({
-  id: z.string(), // PeerJS id, e.g. "wt-factory1-dispatch"
+  id: z.string(), // PeerJS id, e.g. "wt-ward3-dispatch"
   name: z.string(), // display name
   role: RoleSchema,
 });
@@ -38,12 +38,24 @@ export type ShiftEvent = z.infer<typeof ShiftEventSchema>;
 export const NoteStatusSchema = z.enum(["pending", "ready", "unavailable"]);
 export type NoteStatus = z.infer<typeof NoteStatusSchema>;
 
+// "urgent" = danger to people or production right now (red banner), "info" = good to know.
+export const NotePrioritySchema = z.enum(["urgent", "info"]);
+export type NotePriority = z.infer<typeof NotePrioritySchema>;
+
+// What Claude returns for one transcript (structured output, so it always has this shape).
+export const SimpleNoteSchema = z.object({
+  note: z.string(),
+  priority: NotePrioritySchema,
+});
+export type SimpleNote = z.infer<typeof SimpleNoteSchema>;
+
 export const FeedItemSchema = z.object({
   id: z.string(),
   speaker: PeerInfoSchema,
   transcript: z.string(),
   note: z.string(),
   noteStatus: NoteStatusSchema,
+  priority: NotePrioritySchema, // set by the AI with the note; "info" until then
   at: z.number(), // epoch ms
 });
 export type FeedItem = z.infer<typeof FeedItemSchema>;
