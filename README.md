@@ -195,6 +195,15 @@ Tested with a real key, which caught two things the mocked tests couldn't:
 - **Drop alerts:** warn Dispatch when someone has been "lost connection" for more than ~2 minutes.
 - **Sound quality:** tune noise suppression, gain and bitrate once tested on separate devices.
 
+### CI/CD
+
+- **Before each commit:** a git hook (e.g. Husky) runs the typecheck, lint and build; before each push, the tests too. Today I ran them by hand before every commit.
+- **On every pull request:** GitHub Actions runs typecheck, lint, build and the Playwright tests. They need no internet and no real key (their own signaling server, a fake Claude), so they run in CI as they are.
+- **AI code review:** BugBot on every pull request, before anything reaches production.
+- **Other models as critics:** the code was written with Claude, so a different model reviews it too. A second model doesn't share the first one's blind spots, and catches what it missed.
+- **Deploy:** preview deploys per pull request, then production from `main`, once the Claude key lives on a backend.
+- **In production:** error monitoring (e.g. Sentry) and alerts when calls or AI notes start failing.
+
 ## How I worked
 
 - Built in about 5 hours with Claude Code as a pair programmer, in small steps, each explained before it was written and committed by me.
