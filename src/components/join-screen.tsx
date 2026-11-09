@@ -13,7 +13,7 @@ interface JoinScreenProps {
 // First screen: who you are, which channel, and your role. Full width on phones, a card on desktop.
 export const JoinScreen = ({ errorMessage, onJoin }: JoinScreenProps): JSX.Element => {
   const [name, setName] = useState<string>("");
-  const [channel, setChannel] = useState<string>("factory1");
+  const [channel, setChannel] = useState<string>("ward3");
   const [role, setRole] = useState<Role>("member");
 
   const isMember: boolean = role === "member";

@@ -9,7 +9,7 @@ interface RosterItemProps {
 
 // One person in Dispatch's team list.
 export const RosterItem = ({ peer, isMe, isSpeaking }: RosterItemProps): JSX.Element => {
-  const icon: string = peer.role === "dispatch" ? "🎧" : "👷";
+  const icon: string = peer.role === "dispatch" ? "🩺" : "🧑‍⚕️";
 
   return (
     <li className="flex items-center gap-2">

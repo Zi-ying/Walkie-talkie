@@ -10,8 +10,8 @@ interface RoleCardProps {
 }
 
 const ROLE_DETAILS: Record<Role, { icon: string; label: string; description: string }> = {
-  member: { icon: "👷", label: "Member", description: "Talk with your team" },
-  dispatch: { icon: "🎧", label: "Dispatch", description: "Coordinate the channel" },
+  member: { icon: "🧑‍⚕️", label: "Member", description: "Talk with your team" },
+  dispatch: { icon: "🩺", label: "Dispatch", description: "Coordinate the channel" },
 };
 
 // One of the two big role choices on the join screen (behaves as a radio button).
