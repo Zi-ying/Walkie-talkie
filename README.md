@@ -151,6 +151,16 @@ Tested with a real key, which caught two things the mocked tests couldn't:
 - **Fold Dispatch's notes** into a dropdown, like the team list and the shift log.
 - **Offline team members:** show who is expected on shift but offline (needs registered members).
 
+### UI
+
+- **Built for stress and busy hands:** one huge button, high-contrast text, red only for danger. Next steps keep that focus.
+- **Sounds:** a short "go ahead" beep when you get the floor, and a "channel busy" tone.
+- **Push-to-talk feedback:** a pulsing ring while you're on air, and a press animation.
+- **Speaker visual:** a live audio-level meter next to whoever is talking.
+- **Themes:** light and dark, and a high-contrast mode for accessibility.
+- **Polish:** transitions between screens, a short "how it works" on first join, a logo.
+- **Design system:** shared tokens (colours, spacing, radii) and components, to stay consistent as it grows.
+
 ### AI
 
 - **Private speech-to-text:** Whisper on a backend instead of Chrome's recognition. Handles accents much better, and works in every browser.
@@ -201,14 +211,16 @@ Tested with a real key, which caught two things the mocked tests couldn't:
 - Researched WebRTC vs WebSocket and libraries, and chose PeerJS.
 - Set the plan: about 4 hours, smallest working version.
 
-**Session 2: building (1h49)**
+**Session 2: building (1h50)**
 
 - The radio: channel, Dispatch hub, voice, push-to-talk, tests.
 
-**Session 3: building (1h13)**
+**Session 3: building (1h15)**
 
 - AI notes, member and Dispatch views.
 
-**Session 4: building, testing and reviewing (from 08:28, add the stop time)**
+**Session 4: building, testing and reviewing (1h)**
 
 - Urgent triage, healthcare setting, real Claude test, cleanup, README.
+
+**Total: about 4h45** (40 min + 1h50 + 1h15 + 1h), within the 5 hours.
