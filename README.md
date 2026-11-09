@@ -1,12 +1,12 @@
 # 📻 Walkie-Talkie
 
-A push-to-talk radio in the browser for teams without reliable phone coverage (factories, hospitals). People join a channel with a code; one person is Dispatch, the others are members. Hold the button to talk, one speaker at a time. Every transmission is transcribed, and an LLM rewrites it as a short, simple note for people who can't hear the audio.
+A push-to-talk radio in the browser for care teams (hospitals, care homes), where nurses and doctors need to reach each other fast and phones aren't always at hand. People join a channel with a code; one person is Dispatch, the others are members. Hold the button to talk, one speaker at a time. Every transmission is transcribed, and an LLM rewrites it as a short, simple note for people who can't hear the audio, and flags the urgent ones (a fall, someone not breathing) in red.
 
 Built in a few hours as a frontend-only MVP (React, TypeScript, Tailwind, PeerJS/WebRTC). The sections below explain how to run it, how it works, and how the full system would look.
 
 **Two views, for phone and desktop:**
-- **Member** (simple, hands busy): the latest AI note in a big banner, who's talking, a big push-to-talk button, and who's online as avatars in the top bar (a green ring around whoever is speaking). AI notes only: no transcripts, no lists to manage.
-- **Dispatch** (the overview): the team and the shift log, the talk panel, and every note with its original words one click away (to catch AI mistakes). Three columns on desktop, a bottom tab bar (Team / Talk / Notes) on phones.
+- **Member** (simple, hands busy): the latest AI note in a big banner (red, flashing and vibrating if urgent), who's talking, a big push-to-talk button, and who's online as avatars in the top bar (a green ring around whoever is speaking). AI notes only: no transcripts, no lists to manage.
+- **Dispatch** (the overview): the team and the shift log, the talk panel, and every note with its priority badge and its original words one click away (to catch AI mistakes). Three columns on desktop, a bottom tab bar (Team / Talk / Notes) on phones.
 
 ## How to run
 
@@ -34,9 +34,10 @@ Requires Node and Yarn, and Chrome (or Edge) for the microphone and speech recog
    ```
 
 4. **Open `http://localhost:5173` in two Chrome tabs**, with headphones on (tabs on one laptop share the speakers and the mic, which causes echo):
-   - Tab 1: a name, channel `factory1`, role **Dispatch** → Join.
+   - Tab 1: a name, channel `ward3`, role **Dispatch** → Join.
    - Tab 2: another name, the same channel, role **Member** → Join. Both tabs show "Hearing 1 person".
-   - Hold "Hold to talk" in one tab and speak: the other tab hears you, and the transcript appears in Messages.
+   - Hold "Hold to talk" in one tab and speak: the other tab hears you. With a Claude key, the AI note appears on both tabs; Dispatch also sees the original words under Notes.
+   - Speech recognition listens in the browser's language (`navigator.language`): with Chrome set to French, speak French.
 
 Without a local server (remove the two `VITE_PEERJS_…` lines from `.env`), the app uses the free PeerJS cloud server, which is shared and rate-limits when many peers connect in a short time.
 
@@ -57,7 +58,7 @@ yarn playwright install chromium   # once
 yarn test:e2e
 ```
 
-End-to-end tests (Playwright) open real Chrome pages with a fake microphone (a test tone) and check the core flows: dispatch and members hear each other, a member waiting for dispatch, a duplicate dispatch being refused, "ended shift" vs "lost connection" in the shift log, members coming back when dispatch reopens the channel, push-to-talk, the AI notes, and that audio really reaches the others only while the button is held (measured with WebRTC's own statistics).
+End-to-end tests (Playwright) open real Chrome pages with a fake microphone (a test tone) and check the core flows: dispatch and members hear each other, a member waiting for dispatch, a duplicate dispatch being refused, "ended shift" vs "lost connection" in the shift log, members coming back when dispatch reopens the channel, push-to-talk, the AI notes (including an urgent one, and Claude failing), and that audio really reaches the others only while the button is held (measured with WebRTC's own statistics).
 
 They start their own servers and need no internet: a local PeerJS signaling server (the official [`peer`](https://github.com/peers/peerjs-server) package) and the app pointed at it. The AI-note tests never call the real Claude API: the test app gets a fake key, the speech recognition is faked, and the request to Claude is intercepted, so they cost nothing.
 
@@ -65,11 +66,15 @@ They start their own servers and need no internet: a local PeerJS signaling serv
 
 Each transmission is transcribed, then Claude rewrites it as a short, simple note shown to everyone, in a big banner and in the message feed. It is for people who are deaf or hard of hearing, have a speech impediment, or are somewhere too noisy to hear.
 
+Claude also **triages** each message: 🔴 **urgent** (a patient, resident or staff member in danger right now: a fall, not breathing, chest pain…) or 🟡 **info** (routine care, meals, handover). Urgent notes get a red banner that flashes harder, interrupts screen readers and makes phones vibrate. The answer uses **structured output** (`messages.parse` with a zod schema), so it is always `{ note, priority }`, never free text to parse. The prompt says "when in doubt, choose info": too many false red alarms would teach people to ignore red.
+
 1. **Speech to text** runs on the speaker's laptop while they hold the button (browser Web Speech API, Chrome and Edge only).
 2. **The transcript goes to Dispatch**, which calls Claude (`claude-haiku-5-5`, the fastest and cheapest model, at low effort: about $0.0001 per note) and shares the transcript, then the note, with everyone.
 3. **The radio never depends on the AI:** without a key, or if the call fails, everyone still sees the transcript, and the note shows as unavailable.
 
 The radio and the AI are separate pieces, put together only in `app.tsx`: `useChannel` (the radio) takes an optional `writeNote` function and knows nothing about speech recognition or Claude; `useTranscription` turns speech into text while you're on air; `lib/llm.ts` writes the note. Each works, and can be replaced, on its own.
+
+**Tested with a real key**, beyond the mocked tests. It caught two things the mocks couldn't: "hello" came back as "Unclear message." (fixed in the prompt: short radio messages like "yes" or "on my way" now stay as they are), and English spoken with Chrome set to French was transcribed as French (see "If I had more time").
 
 The key is used from Dispatch's browser, so anyone who opens the page could read it: fine for a local demo, not for a public deployment (see the production architecture below).
 
@@ -124,9 +129,10 @@ The key is used from Dispatch's browser, so anyone who opens the page could read
 - **Admin page and registered members:** an admin creates channels and registers members ahead of time, so each person has a fixed id assigned once (not a random one per session). Only registered members can join a channel, and channel names are created and validated by the admin rather than typed freely (the MVP accepts any channel name, and PeerJS rejects names with characters outside `A-Z a-z 0-9 - _`). This needs a backend: a member registry, authentication, and a signaling server that checks membership before connecting peers.
 - **A backend for the AI and the text messages:** a small server holds the Claude API key (never shipped to browsers) and makes the Claude call. A WebSocket service carries the text messages (transcripts, notes, roster, shift log) with history, so people who were offline catch up, while voice stays on WebRTC. The MVP is frontend-only, so text goes over WebRTC data channels between browsers instead.
 - **Private speech-to-text:** Chrome's Web Speech API sends the audio to Google's servers to recognise it, which is a real concern in a hospital. Replace it with a self-hosted speech model (e.g. Whisper) on the backend, which would also work in every browser.
-- **Note priority, suggested by the AI (designed, next step):** two levels. 🔴 **Urgent** (fire, injury, evacuation): red banner, stronger flash, the phone vibrates. 🟡 **Info** (good to know): the yellow banner of today. Claude already reads every message, so it also suggests the priority (a triage, not just a rewrite), using structured output so the answer is always `{ note, priority }`; Dispatch can change it.
+- **Choose the speaking language:** speech recognition uses the browser's language, so English spoken in a French Chrome comes out as French words. Add a "Speaking language" choice on the join screen (care teams are often multilingual), and with Whisper (above), accents are handled far better than by Chrome's recognition.
+- **Fold Dispatch's notes:** the Notes column grows with every message; make it a dropdown like "On the channel" and "Shift log" (open by default), with a scroll.
 - **Dispatch corrects shared notes (designed, next step):** notes keep going to members right away (fastest in an emergency); Dispatch can then edit the text, change the priority, or retract a note, and members' screens update. Chosen over "review before sharing", which would make members wait whenever Dispatch is busy.
-- **More AI on the history:** shift summaries, "what did I miss?" questions, and detecting recurring issues (the same machine jamming every day).
+- **More AI on the history:** shift summaries, "what did I miss?" questions, and detecting recurring issues (the same resident falling every night).
 - **Offline team members:** with registered members (below), Dispatch's team list also shows who is expected on shift but offline.
 - **One-on-one with Dispatch:** a member talks privately to Dispatch without disturbing the main channel (the "two channels" idea in the brainstorm). Design: today one microphone stream feeds every call, so muting is all or nothing; private talk needs a copy of the mic per call (`stream.clone()`) to switch on only the connection to Dispatch, its own floor (a private conversation shouldn't block the main channel), and private messages kept out of the shared feed.
 - **Dispatch priority / emergency override:** Dispatch (or an emergency button) takes the floor immediately, cutting off the current speaker. In the MVP everyone follows the same first-come rule, so an urgent message waits until the speaker releases.
@@ -138,3 +144,11 @@ The key is used from Dispatch's browser, so anyone who opens the page could read
 - **Drop alerts:** alert Dispatch when someone has been "lost connection" for more than ~2 minutes during a shift.
 - **Rejoin after a drop:** a member who lost their own connection has to join again by hand (members already reconnect automatically when Dispatch comes back).
 - **Channel without Dispatch:** in the MVP, Dispatch is the meeting point, so members can't find each other until Dispatch is online. Fix: numbered "seat" ids, or the channel service above.
+
+## How I worked
+
+Built in about 5 hours with Claude Code as a pair programmer, in small steps, each explained before it was written and committed by me.
+
+- **What I decided:** the product (care teams, Dispatch as the hub, member vs Dispatch views, AI notes for accessibility, urgent triage), the scope (what went into "If I had more time"), and the code standards (explicit types, no abbreviations, one component per mapped item, kebab-case files).
+- **What I delegated:** most of the typing, the Playwright test scaffolding, and the README drafts.
+- **How I checked it:** I tested every step by hand in two tabs, asked for real end-to-end tests early (15 now, including a measured-audio test), refused a mock radio ("it's supposed to work"), kept the radio decoupled from the AI, and ran the real Claude API at the end, which caught the two issues above.
