@@ -4,8 +4,6 @@ import { expectHearing, joinChannel, leaveChannel, openSection, uniqueChannel } 
 
 import type { BrowserContext, Locator, Page } from "@playwright/test";
 
-// Each page is a different person on the channel (like separate tabs).
-
 test("dispatch and member hear each other; members see who's online, dispatch sees the shift log", async ({
   context,
 }: { context: BrowserContext }): Promise<void> => {
@@ -21,7 +19,6 @@ test("dispatch and member hear each other; members see who's online, dispatch se
   await expectHearing(dispatch, 1);
   await expectHearing(member, 1);
 
-  // Members: who's online, as avatars in the top bar (no roster list, no shift log).
   const memberOnline: Locator = member.getByRole("list", { name: "Online" });
   await expect(memberOnline.getByLabel("Ana (Dispatch)")).toBeVisible();
   await expect(memberOnline.getByLabel("Bob")).toBeVisible();

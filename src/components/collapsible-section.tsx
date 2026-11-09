@@ -5,7 +5,6 @@ interface CollapsibleSectionProps {
   children: ReactNode;
 }
 
-// A folded section: click the title (with its arrow) to show the content, which scrolls when long.
 export const CollapsibleSection = ({ title, children }: CollapsibleSectionProps): JSX.Element => (
   <details className="group">
     <summary className="flex cursor-pointer list-none items-center gap-2 text-xs font-bold uppercase tracking-wide text-zinc-500 hover:text-zinc-300">

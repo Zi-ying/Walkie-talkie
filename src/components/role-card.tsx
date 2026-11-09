@@ -14,7 +14,6 @@ const ROLE_DETAILS: Record<Role, { icon: string; label: string; description: str
   dispatch: { icon: "🩺", label: "Dispatch", description: "Coordinate the channel" },
 };
 
-// One of the two big role choices on the join screen (behaves as a radio button).
 export const RoleCard = ({ role, isSelected, onSelect }: RoleCardProps): JSX.Element => {
   const { icon, label, description } = ROLE_DETAILS[role];
   const className: string = cn(

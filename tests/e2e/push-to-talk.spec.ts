@@ -4,7 +4,6 @@ import { expectHearing, joinChannel, uniqueChannel } from "./channel-helpers.ts"
 
 import type { BrowserContext, Locator, Page } from "@playwright/test";
 
-// Holds the mouse down on the push-to-talk button (pointerdown), like a finger on the button.
 const holdToTalk = async (page: Page): Promise<void> => {
   await page.getByRole("button", { name: "Hold to talk" }).hover();
   await page.mouse.down();

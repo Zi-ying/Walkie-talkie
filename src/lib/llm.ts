@@ -5,9 +5,6 @@ import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import type { ParsedMessage } from "@anthropic-ai/sdk/lib/parser";
 import type { SimpleNote } from "@/lib/types";
 
-// Turns a radio transcript into a short, simple note for people who can't hear the audio,
-// and sorts it: urgent or just good to know.
-// Haiku: fastest and cheapest model; plenty for one-sentence notes.
 const MODEL: Anthropic.Model = "claude-haiku-5-5";
 
 const SYSTEM_PROMPT: string = `You turn walkie-talkie transcripts from care teams (hospitals, care homes) into short written notes for teammates who cannot hear the audio: people who are deaf or hard of hearing, or who are in a noisy place. The transcript comes from automatic speech recognition, so it may contain filler words or small recognition mistakes.
@@ -23,8 +20,6 @@ Then set the priority:
 - "urgent": a patient, resident or staff member in danger right now (fall, not breathing, chest pain, bleeding, choking, aggression, fire, someone needs help immediately).
 - "info": everything else (updates, questions, routine care, meals, supplies, handover). When in doubt, choose "info".`;
 
-// Frontend-only MVP: the key lives in the browser (.env, VITE_ANTHROPIC_API_KEY), so anyone who
-// opens the page could read it. Fine for a local demo; in production a backend would hold it.
 const envApiKey: string | undefined = import.meta.env.VITE_ANTHROPIC_API_KEY;
 const apiKey: string = envApiKey === undefined ? "" : envApiKey;
 
@@ -35,8 +30,6 @@ const client: Anthropic | null =
 
 export const isLlmAvailable = (): boolean => client !== null;
 
-// Resolves with the note and its priority, or null when there is no key or the call fails (the
-// radio never depends on the AI: everyone still sees the transcript).
 export const writeSimpleNote = async (
   transcript: string,
 ): Promise<SimpleNote | null> => {
@@ -47,7 +40,6 @@ export const writeSimpleNote = async (
     const response: ParsedMessage<SimpleNote> = await client.messages.parse({
       model: MODEL,
       max_tokens: 1024,
-      // a one-line rewrite needs little thinking; the format makes the reply match SimpleNoteSchema
       output_config: {
         effort: "low",
         format: zodOutputFormat(SimpleNoteSchema),

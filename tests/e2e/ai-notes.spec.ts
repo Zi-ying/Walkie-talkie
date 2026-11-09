@@ -10,8 +10,6 @@ const TRANSCRIPT: string =
 const NOTE: string = "Mrs Jones, room 12, asks for pain medication. Nurse needed.";
 const INFO_NOTE: SimpleNote = { note: NOTE, priority: "info" };
 
-// Headless Chrome can't recognise speech: replace the Web Speech API with a fake that
-// "hears" TRANSCRIPT and reports it when listening stops.
 const installFakeSpeechRecognition = async (context: BrowserContext): Promise<void> => {
   await context.addInitScript((heardText: string): void => {
     class FakeSpeechRecognition {
@@ -31,7 +29,6 @@ const installFakeSpeechRecognition = async (context: BrowserContext): Promise<vo
         }
       }
     }
-    // globalThis is `window` in the browser (the tests' tsconfig has no DOM types).
     Object.defineProperty(globalThis, "SpeechRecognition", { value: FakeSpeechRecognition });
   }, TRANSCRIPT);
 };
@@ -43,8 +40,6 @@ const CORS_HEADERS: Record<string, string> = {
   "content-type": "application/json",
 };
 
-// Intercepts every call to the Claude API: nothing leaves the machine. Records the request bodies.
-// The reply is the JSON a structured-output answer contains. `answer` null = like an invalid API key.
 const fakeClaude = async (
   context: BrowserContext,
   answer: SimpleNote | null,
@@ -103,7 +98,6 @@ const joinTeam = async (context: BrowserContext): Promise<Team> => {
   return { dispatch, bob, cleo };
 };
 
-// Holds the push-to-talk button until we're on air, then releases it.
 const sayOneMessage = async (page: Page): Promise<void> => {
   await page.getByRole("button", { name: "Hold to talk" }).hover();
   await page.mouse.down();
@@ -121,14 +115,12 @@ test("a transmission is transcribed, and Claude's simple note reaches everyone",
 
   await sayOneMessage(bob);
 
-  // Everyone sees the AI note; only dispatch sees the original words.
   for (const page of [dispatch, bob, cleo]) {
     await expect(page.getByRole("region", { name: "Latest note" })).toContainText(NOTE);
   }
   await expect(dispatch.getByRole("list", { name: "Messages" })).toContainText(TRANSCRIPT);
   await expect(cleo.getByText(TRANSCRIPT)).toHaveCount(0);
 
-  // Only dispatch calls Claude, once, with the cheap model and the transcript.
   expect(requestBodies).toHaveLength(1);
   expect(requestBodies[0]).toContain("claude-haiku-5-5");
   expect(requestBodies[0]).toContain(TRANSCRIPT);

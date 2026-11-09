@@ -11,7 +11,6 @@ interface JoinOptions {
   role: Role;
 }
 
-// Every test gets its own channel, so tests never hear each other on the shared PeerJS server.
 export const uniqueChannel = (): string => `test${generateId()}`;
 
 export const joinChannel = async (
@@ -26,18 +25,15 @@ export const joinChannel = async (
   await page.getByRole("button", { name: "Join channel" }).click();
 };
 
-// The page receives audio from `count` people (read from the connection status label).
 export const expectHearing = async (page: Page, count: number): Promise<void> => {
   const label: string = `Hearing ${count} ${count === 1 ? "person" : "people"}`;
   await expect(page.getByLabel(label, { exact: true })).toBeVisible();
 };
 
-// Unfolds a collapsible section (e.g. "Shift log"), like a user clicking its title.
 export const openSection = async (page: Page, title: string): Promise<void> => {
   await page.locator("summary", { hasText: title }).click();
 };
 
-// Accepts the "End your shift?" / "Close the channel?" confirmation.
 export const leaveChannel = async (page: Page): Promise<void> => {
   page.once("dialog", (dialog: Dialog): void => {
     void dialog.accept();

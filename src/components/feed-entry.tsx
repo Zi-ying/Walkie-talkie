@@ -18,8 +18,6 @@ const noteText = (item: FeedItem): string => {
   }
 };
 
-// Dispatch's view of one transmission: the AI note first, and the original words one click away
-// (to catch AI mistakes). Without a note, the original words are shown directly.
 export const FeedEntry = ({ item }: FeedEntryProps): JSX.Element => {
   const time: string = new Date(item.at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
   const note: string = noteText(item);

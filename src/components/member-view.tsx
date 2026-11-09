@@ -13,8 +13,6 @@ interface MemberViewProps {
   onLeave: () => void;
 }
 
-// The simple view: the latest AI note, who's talking, and a big button. Phone first; on desktop
-// the same column is centered. Members see AI notes only (no transcripts, roster list or shift log).
 export const MemberView = ({ channelApi, channelName, onLeave }: MemberViewProps): JSX.Element => {
   const { status, errorMessage, roster, hearingCount, speaker, isTalking, feed } = channelApi;
 
@@ -22,7 +20,6 @@ export const MemberView = ({ channelApi, channelName, onLeave }: MemberViewProps
   const hasError: boolean = errorMessage !== "";
   const showTranscriptionHint: boolean = isReady && !isTranscriptionSupported();
 
-  // The newest note is the banner, the rest are folded away.
   const notes: FeedItem[] = readyNotesNewestFirst(feed);
   const latestNote: FeedItem | null = notes.length === 0 ? null : notes[0];
   const earlierNotes: FeedItem[] = notes.slice(1);

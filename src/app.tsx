@@ -11,14 +11,11 @@ import type { JSX } from "react";
 import type { ChannelApi, Role } from "@/lib/types";
 
 const App = (): JSX.Element => {
-  // The radio, the speech-to-text and the AI are separate pieces, put together only here.
-  // Without an API key, no note writer is given and the radio works the same, without notes.
   const channelApi: ChannelApi = useChannel({
     writeNote: isLlmAvailable() ? writeSimpleNote : undefined,
   });
   useTranscription(channelApi.isTalking, channelApi.submitTranscript);
 
-  // What we joined with (the channel API only knows our role once connected).
   const [channelName, setChannelName] = useState<string>("");
   const [role, setRole] = useState<Role>("member");
 
@@ -31,7 +28,6 @@ const App = (): JSX.Element => {
     void channelApi.join(name, channel, joinedRole);
   };
 
-  // Leaving is deliberate: members end their shift, dispatch closes the channel for everyone.
   const leave = (): void => {
     const question: string = isDispatch
       ? "Close the channel? Everyone will be disconnected."

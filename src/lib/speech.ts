@@ -1,7 +1,3 @@
-// Speech-to-text with the browser's Web Speech API (Chrome and Edge only).
-// Note: Chrome sends the audio to Google's servers to recognise it; see the README.
-
-// The parts of the Web Speech API we use. TypeScript's DOM types don't include it.
 interface SpeechRecognitionAlternativeLike {
   transcript: string;
 }
@@ -36,7 +32,6 @@ declare global {
   }
 }
 
-// If the browser never reports the end, give up waiting after this long.
 const STOP_TIMEOUT_MS: number = 2000;
 
 const findRecognition = (): SpeechRecognitionConstructor | null => {
@@ -52,19 +47,17 @@ const findRecognition = (): SpeechRecognitionConstructor | null => {
 export const isTranscriptionSupported = (): boolean => findRecognition() !== null;
 
 export interface Listener {
-  // Stops listening and resolves with everything heard (empty string if nothing).
   stop: () => Promise<string>;
 }
 
-// Starts listening right away. Returns null when the browser has no speech recognition.
 export const startListening = (): Listener | null => {
   const Recognition: SpeechRecognitionConstructor | null = findRecognition();
   if (Recognition === null) {
     return null;
   }
   const recognition: SpeechRecognitionLike = new Recognition();
-  recognition.continuous = true; // keep listening while the button is held
-  recognition.interimResults = false; // only final, corrected text
+  recognition.continuous = true;
+  recognition.interimResults = false;
   recognition.lang = navigator.language;
 
   const heard: string[] = [];
@@ -88,7 +81,6 @@ export const startListening = (): Listener | null => {
         resolve(heard.join(" ").trim());
       };
       const timeout: number = window.setTimeout(finish, STOP_TIMEOUT_MS);
-      // The last words arrive in "result" events just before "end".
       recognition.onend = finish;
       recognition.stop();
     });

@@ -41,10 +41,8 @@ import type {
   WireMessage,
 } from "@/lib/types";
 
-// How long a member waits before trying dispatch again when it isn't online.
 const RETRY_DELAY_MS: number = 3000;
 
-// Dispatch's view of one member.
 type MemberEntry = {
   connection: DataConnection;
   info: PeerInfo;
@@ -58,17 +56,12 @@ const newShiftEvent = (peer: PeerInfo, kind: ShiftEventKind): ShiftEvent => ({
   at: Date.now(),
 });
 
-// Writes a short note (with its priority) for a transcript, or null when it can't. Injected by the
-// app, so the radio knows nothing about the AI behind it (and works the same without one).
-export type NoteWriter = (transcript: string) => Promise<SimpleNote | null>;
+type NoteWriter = (transcript: string) => Promise<SimpleNote | null>;
 
-export type ChannelOptions = {
-  writeNote?: NoteWriter; // used by dispatch only; without it, notes are "unavailable"
+type ChannelOptions = {
+  writeNote?: NoteWriter;
 };
 
-// The radio: PeerJS connections, voice, push-to-talk, roster, shift log and message feed.
-// Dispatch is the hub: members connect to it (data + voice), it keeps the roster, the shift log
-// and the feed. Nothing here depends on speech recognition or on an LLM.
 export const useChannel = (options: ChannelOptions = {}): ChannelApi => {
   const { writeNote } = options;
   const [status, setStatus] = useState<ChannelStatus>("idle");
@@ -80,7 +73,6 @@ export const useChannel = (options: ChannelOptions = {}): ChannelApi => {
   const [speakerId, setSpeakerId] = useState<string | null>(null);
   const [feed, setFeed] = useState<FeedItem[]>([]);
 
-  // Refs: PeerJS handlers are created once (at join) and must always see the latest values.
   const peerRef: RefObject<Peer | null> = useRef<Peer | null>(null);
   const meRef: RefObject<PeerInfo | null> = useRef<PeerInfo | null>(null);
   const rosterRef: RefObject<PeerInfo[]> = useRef<PeerInfo[]>([]);
@@ -88,25 +80,21 @@ export const useChannel = (options: ChannelOptions = {}): ChannelApi => {
   const microphoneRef: RefObject<MediaStream | null> = useRef<MediaStream | null>(null);
   const remoteAudiosRef: RefObject<Map<string, HTMLAudioElement>> = useRef<
     Map<string, HTMLAudioElement>
-  >(new Map<string, HTMLAudioElement>()); // keyed by remote peer id
+  >(new Map<string, HTMLAudioElement>());
   const isLeavingRef: RefObject<boolean> = useRef<boolean>(false);
   const retryTimerRef: RefObject<number | null> = useRef<number | null>(null);
   const speakerIdRef: RefObject<string | null> = useRef<string | null>(null);
-  const isHoldingRef: RefObject<boolean> = useRef<boolean>(false); // push-to-talk button held down
+  const isHoldingRef: RefObject<boolean> = useRef<boolean>(false);
   const feedRef: RefObject<FeedItem[]> = useRef<FeedItem[]>([]);
-  // Dispatch only
   const membersRef: RefObject<Map<string, MemberEntry>> = useRef<
     Map<string, MemberEntry>
   >(new Map<string, MemberEntry>());
-  // Member only
   const dispatchConnectionRef: RefObject<DataConnection | null> = useRef<DataConnection | null>(null);
   const dispatchCallRef: RefObject<MediaConnection | null> = useRef<MediaConnection | null>(null);
   const dispatchSaidByeRef: RefObject<boolean> = useRef<boolean>(false);
   const memberCallsRef: RefObject<Map<string, MediaConnection>> = useRef<
     Map<string, MediaConnection>
-  >(new Map<string, MediaConnection>()); // calls we started to other members, keyed by peer id
-
-  // ---------- State that handlers also read ----------
+  >(new Map<string, MediaConnection>());
 
   const updateRoster = (peers: PeerInfo[]): void => {
     rosterRef.current = peers;
@@ -127,7 +115,6 @@ export const useChannel = (options: ChannelOptions = {}): ChannelApi => {
     setFeed(items);
   };
 
-  // A feed item arrives twice: first with the transcript, then again once the AI note is ready.
   const upsertFeedItem = (item: FeedItem): void => {
     const exists: boolean = feedRef.current.some(
       (existing: FeedItem): boolean => existing.id === item.id,
@@ -139,11 +126,8 @@ export const useChannel = (options: ChannelOptions = {}): ChannelApi => {
     );
   };
 
-  // ---------- Audio ----------
-
   const playAudioFrom = (remotePeerId: string, stream: MediaStream): void => {
     const remoteAudios: Map<string, HTMLAudioElement> = remoteAudiosRef.current;
-    // PeerJS can fire "stream" twice for the same call: play each person only once.
     if (remoteAudios.has(remotePeerId)) {
       return;
     }
@@ -172,9 +156,6 @@ export const useChannel = (options: ChannelOptions = {}): ChannelApi => {
     }
   };
 
-  // ---------- Push-to-talk (both sides) ----------
-
-  // The floor changed. Only the speaker's mic is on, and only while they hold the button.
   const applyFloor = (newSpeakerId: string | null): void => {
     speakerIdRef.current = newSpeakerId;
     setSpeakerId(newSpeakerId);
@@ -182,14 +163,11 @@ export const useChannel = (options: ChannelOptions = {}): ChannelApi => {
     if (microphoneRef.current !== null) {
       setMicrophoneEnabled(microphoneRef.current, iHaveFloor && isHoldingRef.current);
     }
-    // Released the button before the floor was granted: give it back right away.
     if (iHaveFloor && !isHoldingRef.current) {
       releaseFloor();
     }
   };
 
-  // Text of what we just said (from any source, e.g. speech-to-text): shared with everyone
-  // through dispatch, which may add a note to it (see `writeNote`).
   const submitTranscript = (text: string): void => {
     const self: PeerInfo | null = meRef.current;
     if (text === "" || self === null || isLeavingRef.current) {
@@ -202,15 +180,12 @@ export const useChannel = (options: ChannelOptions = {}): ChannelApi => {
     }
   };
 
-  // ---------- Dispatch side ----------
-
   const broadcast = (message: WireMessage): void => {
     membersRef.current.forEach((member: MemberEntry): void =>
       sendMessage(member.connection, message),
     );
   };
 
-  // Broadcast first: applyFloor can release the floor again, and that newer "floor" must arrive last.
   const grantFloor = (newSpeakerId: string | null): void => {
     broadcast({ type: "floor", speakerId: newSpeakerId });
     applyFloor(newSpeakerId);
@@ -236,8 +211,6 @@ export const useChannel = (options: ChannelOptions = {}): ChannelApi => {
     broadcast({ type: "feed-item", item });
   };
 
-  // Dispatch shares the transcript right away, then asks `writeNote` for the note (if the app gave
-  // one) and shares the item again with it. A missing or failing note never blocks the transcript.
   const publishTranscript = async (speaker: PeerInfo, transcript: string): Promise<void> => {
     const item: FeedItem = {
       id: generateId(),
@@ -266,7 +239,6 @@ export const useChannel = (options: ChannelOptions = {}): ChannelApi => {
   const handleMemberMessage = (connection: DataConnection, message: WireMessage): void => {
     switch (message.type) {
       case "hello": {
-        // The id and role come from the connection itself, only the name from the message.
         const info: PeerInfo = { id: connection.peer, name: message.peer.name, role: "member" };
         membersRef.current.set(connection.peer, { connection, info, saidBye: false });
         sendMessage(connection, { type: "shift-log", events: shiftLogRef.current });
@@ -284,7 +256,6 @@ export const useChannel = (options: ChannelOptions = {}): ChannelApi => {
         break;
       }
       case "talk-request":
-        // First come, first served: ignored while someone else holds the floor.
         if (speakerIdRef.current === null && membersRef.current.has(connection.peer)) {
           grantFloor(connection.peer);
         }
@@ -302,7 +273,6 @@ export const useChannel = (options: ChannelOptions = {}): ChannelApi => {
         break;
       }
       default:
-        // roster, shift-log, shift-event, floor, feed-item and feed only go from dispatch to members.
         break;
     }
   };
@@ -315,11 +285,10 @@ export const useChannel = (options: ChannelOptions = {}): ChannelApi => {
     membersRef.current.delete(remotePeerId);
     stopAudioFrom(remotePeerId);
     if (isLeavingRef.current) {
-      return; // we are closing the channel ourselves
+      return;
     }
     recordShiftEvent(member.info, member.saidBye ? "ended-shift" : "lost-connection");
     publishRoster();
-    // The speaker left mid-sentence: free the floor so the channel doesn't stay stuck.
     if (speakerIdRef.current === remotePeerId) {
       grantFloor(null);
     }
@@ -338,8 +307,6 @@ export const useChannel = (options: ChannelOptions = {}): ChannelApi => {
     });
   };
 
-  // ---------- Member side ----------
-
   const sendToDispatch = (message: WireMessage): void => {
     const connection: DataConnection | null = dispatchConnectionRef.current;
     if (connection !== null && connection.open) {
@@ -347,8 +314,6 @@ export const useChannel = (options: ChannelOptions = {}): ChannelApi => {
     }
   };
 
-  // Both sides: give the floor back. Dispatch frees it directly, members tell dispatch
-  // (and mute right away, without waiting for the new "floor" message).
   const releaseFloor = (): void => {
     if (meRef.current === null) {
       return;
@@ -371,7 +336,6 @@ export const useChannel = (options: ChannelOptions = {}): ChannelApi => {
   };
 
   const forgetDispatch = (dispatchId: string): void => {
-    // Clear the refs first: closing fires "close", which must not be handled as dispatch leaving.
     const connection: DataConnection | null = dispatchConnectionRef.current;
     const call: MediaConnection | null = dispatchCallRef.current;
     dispatchConnectionRef.current = null;
@@ -385,8 +349,6 @@ export const useChannel = (options: ChannelOptions = {}): ChannelApi => {
     stopAudioFrom(dispatchId);
   };
 
-  // Voice mesh: members also call each other, so everyone hears everyone (fine for small groups).
-  // Both sides get the same roster, and only the smaller id calls, so each pair has exactly one call.
   const syncMemberCalls = (peers: PeerInfo[]): void => {
     const peer: Peer | null = peerRef.current;
     const self: PeerInfo | null = meRef.current;
@@ -396,7 +358,6 @@ export const useChannel = (options: ChannelOptions = {}): ChannelApi => {
     }
     const peerIds: string[] = peers.map((rosterPeer: PeerInfo): string => rosterPeer.id);
 
-    // Hang up on, and stop hearing, anyone who left the roster.
     memberCallsRef.current.forEach((call: MediaConnection, remoteId: string): void => {
       if (!peerIds.includes(remoteId)) {
         call.close();
@@ -448,7 +409,6 @@ export const useChannel = (options: ChannelOptions = {}): ChannelApi => {
         updateFeed(message.items);
         break;
       default:
-        // hello, talk-request, talk-release and transcript only go from members to dispatch.
         break;
     }
   };
@@ -476,7 +436,6 @@ export const useChannel = (options: ChannelOptions = {}): ChannelApi => {
       }
     });
 
-    // Dispatch closed the channel or dropped: log it, then wait for a dispatch again.
     connection.on("close", (): void => {
       if (isLeavingRef.current || connection !== dispatchConnectionRef.current) {
         return;
@@ -491,8 +450,8 @@ export const useChannel = (options: ChannelOptions = {}): ChannelApi => {
       }
       forgetDispatch(dispatchId);
       updateRoster([]);
-      syncMemberCalls([]); // the channel is closed: hang up on the other members too
-      applyFloor(null); // and nobody is talking any more
+      syncMemberCalls([]);
+      applyFloor(null);
       setStatus("waiting-dispatch");
       scheduleRetry(peer, channel);
     });
@@ -506,8 +465,6 @@ export const useChannel = (options: ChannelOptions = {}): ChannelApi => {
     }, RETRY_DELAY_MS);
   };
 
-  // ---------- Public API ----------
-
   const join = async (name: string, channel: string, role: Role): Promise<void> => {
     setErrorMessage("");
     setStatus("connecting");
@@ -519,9 +476,8 @@ export const useChannel = (options: ChannelOptions = {}): ChannelApi => {
     updateShiftLog([]);
     updateFeed([]);
     try {
-      // Ask for the mic first: this runs inside the Join click, which browsers require.
       microphoneRef.current = await getMicrophone();
-      setMicrophoneEnabled(microphoneRef.current, false); // muted until push-to-talk
+      setMicrophoneEnabled(microphoneRef.current, false);
       const id: string = role === "dispatch" ? dispatchPeerId(channel) : memberPeerId(channel);
       const peer: Peer = await createPeer(id);
       peerRef.current = peer;
@@ -541,7 +497,6 @@ export const useChannel = (options: ChannelOptions = {}): ChannelApi => {
         return;
       }
 
-      // "peer-unavailable" is not fatal: dispatch isn't online yet, so wait and try again.
       peer.on("error", (error: PeerError<`${PeerErrorType}`>): void => {
         if (error.type === "peer-unavailable" && !isLeavingRef.current) {
           forgetDispatch(dispatchPeerId(channel));
@@ -562,14 +517,11 @@ export const useChannel = (options: ChannelOptions = {}): ChannelApi => {
     }
   };
 
-  // Says "bye" to everyone we're connected to (so they log "ended shift", not "lost connection"),
-  // then destroys the peer, which releases our id on the PeerJS server.
   const leave = async (): Promise<void> => {
     const peer: Peer | null = peerRef.current;
     if (peer === null) {
       return;
     }
-    // Set before destroy(): destroy() fires "disconnected", which must not trigger a reconnect.
     isLeavingRef.current = true;
     stopRetrying();
     if (meRef.current !== null) {
@@ -595,7 +547,7 @@ export const useChannel = (options: ChannelOptions = {}): ChannelApi => {
     membersRef.current.clear();
     dispatchConnectionRef.current = null;
     dispatchCallRef.current = null;
-    memberCallsRef.current.clear(); // destroy() already hung up every call
+    memberCallsRef.current.clear();
     stopAllAudio();
     isHoldingRef.current = false;
     speakerIdRef.current = null;
@@ -605,7 +557,6 @@ export const useChannel = (options: ChannelOptions = {}): ChannelApi => {
     setStatus("idle");
   };
 
-  // Press: dispatch decides directly, members ask dispatch. Busy channel: wait and press again.
   const startTalking = (): void => {
     const self: PeerInfo | null = meRef.current;
     if (self === null) {
@@ -622,8 +573,6 @@ export const useChannel = (options: ChannelOptions = {}): ChannelApi => {
     }
   };
 
-  // Release: if we hold the floor, give it back. If the grant is still on its way,
-  // applyFloor() will see we let go and give it back as soon as it arrives.
   const stopTalking = (): void => {
     isHoldingRef.current = false;
     if (meRef.current !== null && speakerIdRef.current === meRef.current.id) {

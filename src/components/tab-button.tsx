@@ -16,7 +16,6 @@ interface TabButtonProps {
   onSelect: (tab: DispatchTab) => void;
 }
 
-// One tab of Dispatch's bottom tab bar on phones.
 export const TabButton = ({ details, activeTab, onSelect }: TabButtonProps): JSX.Element => {
   const { tab, label, icon } = details;
   const isActive: boolean = tab === activeTab;

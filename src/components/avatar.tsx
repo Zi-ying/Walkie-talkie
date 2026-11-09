@@ -16,7 +16,6 @@ const initials = (name: string): string =>
     .map((word: string): string => word[0].toUpperCase())
     .join("");
 
-// A person on the channel: their initials in a circle, with a green ring while they're on air.
 export const Avatar = ({ peer, isSpeaking }: AvatarProps): JSX.Element => {
   const isDispatch: boolean = peer.role === "dispatch";
   const label: string = isDispatch ? `${peer.name} (Dispatch)` : peer.name;

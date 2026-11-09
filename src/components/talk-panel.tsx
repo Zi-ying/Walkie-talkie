@@ -14,7 +14,6 @@ interface TalkPanelProps {
   onStop: () => void;
 }
 
-// The heart of both views: the latest AI note, who's on air, and the big push-to-talk button.
 export const TalkPanel = ({
   latestNote,
   speaker,

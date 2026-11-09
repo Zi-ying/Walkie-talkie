@@ -9,13 +9,8 @@ interface NoteBannerProps {
   item: FeedItem;
 }
 
-// Two short buzzes, then a long one: felt even when the screen isn't being watched.
 const URGENT_VIBRATION_MS: number[] = [200, 100, 200, 100, 600];
 
-// The latest AI note in big, high-contrast text: readable at a glance by someone who can't hear.
-// It flashes when it appears (give it `key={item.id}` so a new note restarts the animation),
-// and screen readers announce it (aria-live). Urgent notes are red, flash harder, interrupt the
-// screen reader and make phones vibrate.
 export const NoteBanner = ({ item }: NoteBannerProps): JSX.Element => {
   const isUrgent: boolean = item.priority === "urgent";
   const time: string = new Date(item.at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
@@ -27,7 +22,6 @@ export const NoteBanner = ({ item }: NoteBannerProps): JSX.Element => {
   });
 
   useEffect((): void => {
-    // Phones only: desktop browsers and iOS Safari have no vibration, so check before calling.
     if (isUrgent && "vibrate" in navigator) {
       navigator.vibrate(URGENT_VIBRATION_MS);
     }

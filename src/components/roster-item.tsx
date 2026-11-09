@@ -7,7 +7,6 @@ interface RosterItemProps {
   isSpeaking: boolean;
 }
 
-// One person in Dispatch's team list.
 export const RosterItem = ({ peer, isMe, isSpeaking }: RosterItemProps): JSX.Element => {
   const icon: string = peer.role === "dispatch" ? "🩺" : "🧑‍⚕️";
 

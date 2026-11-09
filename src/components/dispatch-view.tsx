@@ -28,8 +28,6 @@ const TABS: TabDetails[] = [
   { tab: "notes", label: "Notes", icon: "📝" },
 ];
 
-// The overview: team and shift log, talk, and every note with its original words.
-// Desktop: three columns side by side. Phone: one panel at a time, picked with a bottom tab bar.
 export const DispatchView = ({ channelApi, channelName, onLeave }: DispatchViewProps): JSX.Element => {
   const { status, errorMessage, me, roster, shiftLog, hearingCount, speaker, isTalking, feed } =
     channelApi;
@@ -50,7 +48,6 @@ export const DispatchView = ({ channelApi, channelName, onLeave }: DispatchViewP
   const teamTitle: string = `On the channel (${roster.length})`;
   const shiftLogTitle: string = `Shift log (${shiftLog.length})`;
 
-  // On phones only the active panel shows; from md up all three show side by side.
   const panelClassName = (tab: DispatchTab): string =>
     cn("flex-col gap-4 overflow-y-auto p-4 md:flex", {
       flex: activeTab === tab,

@@ -4,7 +4,7 @@ import type { JSX } from "react";
 
 interface PushToTalkButtonProps {
   isTalking: boolean;
-  isBusy: boolean; // someone else holds the floor
+  isBusy: boolean;
   isDisabled: boolean;
   onStart: () => void;
   onStop: () => void;
@@ -20,7 +20,6 @@ const buttonLabel = (isTalking: boolean, isBusy: boolean): string => {
   return "Hold to talk";
 };
 
-// Hold to talk: pointer events cover mouse and touch. Leaving the button also counts as releasing.
 export const PushToTalkButton = ({
   isTalking,
   isBusy,
